@@ -400,22 +400,7 @@
   .ball-teal   { background: radial-gradient(circle at 35% 35%, #40ffe0, #009977); color: #fff; }
   .ball-blue   { background: radial-gradient(circle at 35% 35%, #70aaff, #2244cc); color: #fff; }
   .ball-red    { background: radial-gradient(circle at 35% 35%, #ff6666, #cc0000); color: #fff; }
-  .ball-bonus  {
-    background: radial-gradient(circle at 35% 35%, #ffd700, #aa6600);
-    color: #222;
-    box-shadow: 0 0 14px rgba(255,215,0,0.5);
-    border: 2px solid var(--gold);
-  }
 
-  .bonus-label {
-    font-size: 0.6rem;
-    color: var(--gold);
-    text-align: center;
-    margin-top: -6px;
-    margin-bottom: 4px;
-    font-family: 'Orbitron', monospace;
-    letter-spacing: 0.05em;
-  }
 
   .ball-wrapper {
     display: flex;
@@ -739,9 +724,9 @@ let currentModel = 'groq';
 let currentCount = 1;
 
 const MODES = {
-  loto6: { max: 43, pick: 6, bonus: 1, name: 'ロト6', badge: 'badge-loto6' },
-  loto7: { max: 37, pick: 7, bonus: 2, name: 'ロト7', badge: 'badge-loto7' },
-  mini:  { max: 31, pick: 5, bonus: 1, name: 'ミニロト', badge: 'badge-mini' }
+  loto6: { max: 43, pick: 6, name: 'ロト6', badge: 'badge-loto6' },
+  loto7: { max: 37, pick: 7, name: 'ロト7', badge: 'badge-loto7' },
+  mini:  { max: 31, pick: 5, name: 'ミニロト', badge: 'badge-mini' }
 };
 
 const MODELS = {
@@ -888,15 +873,7 @@ function weightedPick(mode) {
     available.splice(idx, 1);
   }
 
-  // Bonus numbers
-  const bonusNums = [];
-  for (let b = 0; b < m.bonus; b++) {
-    const bAvail = available.filter(n => !bonusNums.includes(n));
-    const bIdx = Math.floor(Math.random() * bAvail.length);
-    bonusNums.push(bAvail[bIdx]);
-  }
-
-  return { main: picked.sort((a,b)=>a-b), bonus: bonusNums.sort((a,b)=>a-b) };
+  return { main: picked.sort((a,b)=>a-b) };
 }
 
 // ===== API call =====
@@ -1006,11 +983,7 @@ async function generate() {
             <div class="ball ${getBallColor(n, mode.max, false)}" style="animation-delay:${bi*0.08}s">${String(n).padStart(2,'0')}</div>
           </div>
         `).join('')}
-        ${s.bonus.map((n, bi) => `
-          <div class="ball-wrapper" style="animation-delay:${(s.main.length+bi)*0.08}s">
-            <div class="ball ball-bonus" style="animation-delay:${(s.main.length+bi)*0.08}s">B${String(n).padStart(2,'0')}</div>
-          </div>
-        `).join('')}
+
       </div>
       <div id="comment-${i}">
         <div class="loading-dots" style="padding:10px 0">
@@ -1030,7 +1003,7 @@ async function generate() {
     const s = sets[i];
     const freq = getFreq(currentMode);
     const freqInfo = s.main.map(n => `${n}番(出現${freq[n]}回)`).join('、');
-    const prompt = `あなたは宝くじ予測AIです。${mode.name}の予測数字について、運気・統計・直感を絡めた面白いコメントを日本語で2〜3文で書いてください。数字: ${s.main.join(', ')}（ボーナス: ${s.bonus.join(', ')}）。頻度データ: ${freqInfo}。楽しく前向きなトーンで。`;
+    const prompt = `あなたは宝くじ予測AIです。${mode.name}の予測数字について、運気・統計・直感を絡めた面白いコメントを日本語で2〜3文で書いてください。数字: ${s.main.join(', ')}。頻度データ: ${freqInfo}。楽しく前向きなトーンで。`;
 
     try {
       const comment = await callAPI(prompt);
