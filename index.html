@@ -1319,7 +1319,9 @@ async function generate() {
     const s = sets[i];
     const freq = getFreq(currentMode);
     const freqInfo = s.main.map(n => `${n}番(出現${freq[n]}回)`).join('、');
-    const prompt = `あなたは宝くじ予測AIです。${mode.name}の予測数字について、運気・統計・直感を絡めた面白いコメントを日本語で2〜3文で書いてください。数字: ${s.main.join(', ')}。頻度データ: ${freqInfo}。楽しく前向きなトーンで。`;
+    const prompt = `以下のロト予測数字について、運気・統計・直感を絡めた楽しいコメントを日本語で2〜3文だけ書いてください。思考過程や下書きは不要です。日本語のコメント文のみ出力してください。
+数字: ${s.main.join(', ')}（${mode.name}）
+頻度データ: ${freqInfo}`;
 
     try {
       const comment = await callAPI(prompt);
