@@ -1114,6 +1114,20 @@ async function generateNumbers() {
   const mode = MODES[currentMode];
   const drawDate = new Date(drawDateVal + 'T12:00:00');
 
+  // ===== Validate draw date =====
+  const dow = drawDate.getDay();
+  const mon = drawDate.getMonth() + 1;
+  const day = drawDate.getDate();
+
+  if (dow === 0 || dow === 6) {
+    showError('土日は抽選が行われません。月〜金曜日を選択してください。');
+    return;
+  }
+  if ((mon === 12 && day === 31) || (mon === 1 && (day >= 1 && day <= 3))) {
+    showError('年末年始（12月31日〜1月3日）は抽選が行われません。');
+    return;
+  }
+
   // Calculate moon age, kyusei, day lucky
   const moonAge = getMoonAge(drawDate);
   const moonPhase = getMoonPhase(moonAge);
