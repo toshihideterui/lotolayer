@@ -737,34 +737,14 @@
     <p class="api-note" style="margin-top:8px;">※ 月齢・九星気学・曜日を組み合わせてその日のラッキーナンバーを導き出します</p>
   </div>
 
-  <!-- Model + API (unified card) -->
+  <!-- API key card -->
   <div class="card">
-    <div class="card-title">AI モデル / API キー</div>
-    <div class="model-grid" style="margin-bottom:14px;">
-      <button class="model-btn active" onclick="selectModel('groq')" id="model-groq">
-        <span class="model-dot"></span>Groq（llama-3.3-70b）
-      </button>
-      <button class="model-btn" onclick="selectModel('gemma')" id="model-gemma">
-        <span class="model-dot"></span>Gemma（gemma-4-31b-it）
-      </button>
+    <div class="card-title">Groq API キー</div>
+    <div class="api-input-wrap">
+      <input type="password" class="api-input" id="groqKey" placeholder="gsk_..." />
+      <button class="api-show-btn" onclick="toggleKey('groqKey', this)">表示</button>
     </div>
-    <div class="api-row">
-      <div class="api-col">
-        <div class="api-col-label"><span class="api-icon">⚡</span> Groq APIキー</div>
-        <div class="api-input-wrap">
-          <input type="password" class="api-input api-input-half" id="groqKey" placeholder="gsk_..." />
-          <button class="api-show-btn" onclick="toggleKey('groqKey', this)">表示</button>
-        </div>
-      </div>
-      <div class="api-col">
-        <div class="api-col-label"><span class="api-icon">🔷</span> Gemma APIキー</div>
-        <div class="api-input-wrap">
-          <input type="password" class="api-input api-input-half" id="gemmaKey" placeholder="AIza..." />
-          <button class="api-show-btn" onclick="toggleKey('gemmaKey', this)">表示</button>
-        </div>
-      </div>
-    </div>
-    <p class="api-note" style="margin-top:8px;">どちらか一方のAPIキーがあれば動作します。両方入力するとGroqを優先します。</p>
+    <p class="api-note" style="margin-top:8px;">Groq（llama-3.3-70b）を使用します。<a href="https://console.groq.com" target="_blank" style="color:var(--blue);">console.groq.com</a> で無料取得できます。</p>
   </div>
 
   <!-- Count -->
@@ -828,8 +808,7 @@ const MODES = {
 };
 
 const MODELS = {
-  groq:  'llama-3.3-70b-versatile',
-  gemma: 'gemma-4-31b-it'
+  groq: 'llama-3.3-70b-versatile'
 };
 
 // ===== Frequency data (simulated from historical patterns) =====
@@ -899,7 +878,7 @@ function selectMode(mode) {
 
 function selectModel(model) {
   currentModel = model;
-  ['groq','gemma'].forEach(m => {
+  ['groq'].forEach(m => {
     document.getElementById('model-'+m).classList.toggle('active', m === model);
   });
 }
@@ -982,50 +961,27 @@ function weightedPick(mode) {
 }
 
 // ===== API call =====
-const GEMMA_MODELS = ['gemma'];
-
 async function callAPI(prompt) {
-  const isGemma = GEMMA_MODELS.includes(currentModel);
-  const model = MODELS[currentModel];
-
-  if (isGemma) {
-    const apiKey = document.getElementById('gemmaKey').value.trim();
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1200, temperature: 0.8 }
-      })
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Gemma API error: ${resp.status}`);
-    }
-    const data = await resp.json();
-    return data.candidates[0].content.parts[0].text;
-  } else {
-    const apiKey = document.getElementById('groqKey').value.trim();
-    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1200,
-        temperature: 0.8
-      })
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Groq API error: ${resp.status}`);
-    }
-    const data = await resp.json();
-    return data.choices[0].message.content;
+  const apiKey = document.getElementById('groqKey').value.trim();
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: MODELS['groq'],
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1200,
+      temperature: 0.8
+    })
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Groq API error: ${resp.status}`);
   }
+  const data = await resp.json();
+  return data.choices[0].message.content;
 }
 
 // ===== Toggle key visibility =====
@@ -1222,7 +1178,7 @@ async function generateNumbers() {
       const result2 = await callAPI(prompt2);
       document.getElementById('numbers-comment').innerHTML = `
         <div class="ai-comment">
-          <div class="ai-comment-header">✦ 月齢×九星×曜日 総合解説 — ${MODELS[currentModel]}</div>
+          <div class="ai-comment-header">✦ 月齢×九星×曜日 総合解説 — llama-3.3-70b</div>
           <div style="color:#111;font-size:0.85rem;line-height:1.7;">${result2.trim().split('\n').join('<br>')}</div>
         </div>
       `;
@@ -1245,22 +1201,30 @@ async function generateNumbers() {
 
 // ===== Extract Japanese text from AI response =====
 function extractJapanese(text) {
-  // Split by lines and find lines that are mostly Japanese
+  // Remove markdown bold markers like **word**
+  text = text.replace(/\*\*[^*]+\*\*/g, '');
+  // Remove lines starting with * or containing thinking keywords
+  const skipPatterns = ['Draft', 'Selection:', 'Constraint', 'Role:', 'Task:', 'Goal:', 'Format:', 'Tone:', 'Note:', 'Numbers:', 'Frequency', 'Statistics', 'Luck', 'Intuition', 'Too plain', 'Better', 'Good,', 'Also good', 'sentences?', 'Japanese?', 'thinking'];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const jpLines = [];
   for (const line of lines) {
-    // Count Japanese characters (hiragana, katakana, kanji)
-    const jpChars = (line.match(/[\u3040-\u9fff]/g) || []).length;
-    const ratio = jpChars / line.length;
-    // Keep lines that are at least 30% Japanese and don't look like thinking markers
-    if (ratio >= 0.3 && !line.startsWith('*') && !line.startsWith('-') && !line.includes('Draft') && !line.includes('Selection:') && !line.includes('Constraint')) {
-      jpLines.push(line);
+    // Skip lines with thinking markers
+    const hasSkip = skipPatterns.some(p => line.includes(p));
+    if (hasSkip) continue;
+    // Remove leading * - characters
+    const cleaned = line.replace(/^[\*\-•]+\s*/, '').trim();
+    if (!cleaned) continue;
+    // Count Japanese characters
+    const jpChars = (cleaned.match(/[\u3040-\u9fff]/g) || []).length;
+    const ratio = jpChars / cleaned.length;
+    if (ratio >= 0.25) {
+      jpLines.push(cleaned);
     }
   }
   if (jpLines.length > 0) return jpLines.join('<br>');
-  // Fallback: return last 2-3 sentences that contain Japanese
-  const jpSentences = text.match(/[^。！？]*[\u3040-\u9fff][^。！？]*[。！？]/g) || [];
-  if (jpSentences.length > 0) return jpSentences.slice(-3).join('');
+  // Fallback: extract Japanese sentences directly
+  const jpSentences = text.match(/[\u3040-\u9fff][^。！？]*[。！？]/g) || [];
+  if (jpSentences.length > 0) return jpSentences.slice(0, 3).join('');
   return text.trim();
 }
 
@@ -1272,21 +1236,11 @@ async function generate() {
   }
 
   const groqKey = document.getElementById('groqKey').value.trim();
-  const gemmaKey = document.getElementById('gemmaKey').value.trim();
-  if (!groqKey && !gemmaKey) {
-    showError('GroqまたはGemmaのAPIキーを入力してください');
+  if (!groqKey) {
+    showError('Groq APIキーを入力してください');
     return;
   }
-  // Groq優先: groqKeyがあればgroq、なければgemma
-  if (groqKey) {
-    currentModel = 'groq';
-    document.getElementById('model-groq').classList.add('active');
-    document.getElementById('model-gemma').classList.remove('active');
-  } else {
-    currentModel = 'gemma';
-    document.getElementById('model-gemma').classList.add('active');
-    document.getElementById('model-groq').classList.remove('active');
-  }
+  currentModel = 'groq';
 
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
@@ -1343,11 +1297,10 @@ async function generate() {
 
     try {
       const rawComment = await callAPI(prompt);
-      // Extract Japanese only: find last Japanese sentence block
       const comment = extractJapanese(rawComment);
       document.getElementById(`comment-${i}`).innerHTML = `
         <div class="ai-comment">
-          <div class="ai-comment-header">AI予測コメント — ${MODELS[currentModel]}</div>
+          <div class="ai-comment-header">AI予測コメント — llama-3.3-70b</div>
           ${comment}
         </div>
       `;
@@ -1478,16 +1431,11 @@ function showError(msg) {
 // ===== Init =====
 renderStats();
 
-// Save/load API keys
+// Save/load API key
 const savedGroq = localStorage.getItem('loto_layer_groq');
-const savedGemma = localStorage.getItem('loto_layer_gemma');
 if (savedGroq) document.getElementById('groqKey').value = savedGroq;
-if (savedGemma) document.getElementById('gemmaKey').value = savedGemma;
 document.getElementById('groqKey').addEventListener('input', e => {
   localStorage.setItem('loto_layer_groq', e.target.value);
-});
-document.getElementById('gemmaKey').addEventListener('input', e => {
-  localStorage.setItem('loto_layer_gemma', e.target.value);
 });
 </script>
 </body>
