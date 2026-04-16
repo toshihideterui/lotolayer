@@ -998,7 +998,7 @@ async function callAPI(prompt) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 800, temperature: 0.8 }
+        generationConfig: { maxOutputTokens: 1200, temperature: 0.8 }
       })
     });
     if (!resp.ok) {
@@ -1018,7 +1018,7 @@ async function callAPI(prompt) {
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 800,
+        max_tokens: 1200,
         temperature: 0.8
       })
     });
@@ -1158,7 +1158,7 @@ async function generateNumbers() {
 4. これらを統合して${mode.digits}桁の番号（各桁0〜9）を導く
 5. 必ず最後の行に「予測番号：X-X-X${mode.digits===4?'-X':''}」の形式のみで出力する（Xは0〜9の数字）
 
-日本語で根拠を明確にしながら解説してください。`;
+各ステップは2〜3文で簡潔にまとめ、全体で300文字以内にしてください。日本語で解説してください。`;
 
   try {
     const result = await callAPI(prompt);
