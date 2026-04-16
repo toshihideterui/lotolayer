@@ -153,6 +153,15 @@
   .mode-tabs-5 {
     grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
   }
+  .mode-tabs-5 .mode-tab {
+    padding: 10px 4px;
+  }
+  .mode-tabs-5 .tab-name {
+    font-size: 0.7rem;
+  }
+  .mode-tabs-5 .tab-desc {
+    font-size: 0.62rem;
+  }
 
   .mode-tab {
     background: #f5f7fc;
@@ -694,24 +703,24 @@
     <div class="card-title">ロトの種類</div>
     <div class="mode-tabs mode-tabs-5">
       <button class="mode-tab active" onclick="selectMode('loto6')" id="tab-loto6">
-        <span class="tab-name">LOTO 6</span>
-        <span class="tab-desc">1〜43 / 6個</span>
+        <span class="tab-name">L6</span>
+        <span class="tab-desc">1〜43</span>
       </button>
       <button class="mode-tab" onclick="selectMode('loto7')" id="tab-loto7">
-        <span class="tab-name">LOTO 7</span>
-        <span class="tab-desc">1〜37 / 7個</span>
+        <span class="tab-name">L7</span>
+        <span class="tab-desc">1〜37</span>
       </button>
       <button class="mode-tab" onclick="selectMode('mini')" id="tab-mini">
         <span class="tab-name">MINI</span>
-        <span class="tab-desc">1〜31 / 5個</span>
+        <span class="tab-desc">1〜31</span>
       </button>
       <button class="mode-tab" onclick="selectMode('num3')" id="tab-num3">
         <span class="tab-name">N3</span>
-        <span class="tab-desc">ナンバーズ3</span>
+        <span class="tab-desc">数秘術</span>
       </button>
       <button class="mode-tab" onclick="selectMode('num4')" id="tab-num4">
         <span class="tab-name">N4</span>
-        <span class="tab-desc">ナンバーズ4</span>
+        <span class="tab-desc">数秘術</span>
       </button>
     </div>
   </div>
