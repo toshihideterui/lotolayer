@@ -1141,7 +1141,8 @@ async function generateNumbers() {
   document.getElementById('errorArea').style.display = 'none';
   document.getElementById('resultsArea').innerHTML = '';
 
-  const prompt = `あなたは月齢・九星気学・曜日吉数の専門家です。以下の情報をもとに${mode.name}（${mode.digits}桁、各桁0〜9のストレート）のラッキーナンバーを導き出してください。
+  // ===== Step1: 番号だけ先に生成 =====
+  const prompt1 = `あなたは月齢・九星気学・曜日吉数の専門家です。以下の情報をもとに${mode.name}（${mode.digits}桁、各桁0〜9のストレート）の予測番号を1行だけ出力してください。
 
 【抽選日情報】
 ・日付：${dateStr}
@@ -1151,37 +1152,28 @@ async function generateNumbers() {
 ・九星の吉数：${kyusei.luckyNums.join('、')}
 ・曜日の吉数：${dayLucky.nums.join('、')}（${dayLucky.reason}）
 
-【手順】
-1. 月齢フェーズの特性を説明する
-2. 九星気学の年星と日星の組み合わせから吉数を解説する
-3. 曜日の吉数との総合判断を行う
-4. これらを統合して${mode.digits}桁の番号（各桁0〜9）を導く
-5. 必ず最後の行に「予測番号：X-X-X${mode.digits===4?'-X':''}」の形式のみで出力する（Xは0〜9の数字）
-
-各ステップは2〜3文で簡潔にまとめ、全体で300文字以内にしてください。日本語で解説してください。`;
+出力形式：予測番号：X-X-X${mode.digits===4?'-X':''}
+（Xは0〜9の数字、この1行のみ出力）`;
 
   try {
-    const result = await callAPI(prompt);
+    const result1 = await callAPI(prompt1);
 
-    // Extract digits - look for X-X-X or X-X-X-X pattern at end
-    const lines = result.trim().split('\n');
+    // Extract digits
+    const m = result1.match(/[0-9]-[0-9]-[0-9](?:-[0-9])?/);
     let digits = [];
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const m = lines[i].match(/[0-9][-][0-9][-][0-9](?:[-][0-9])?/);
-      if (m) {
-        digits = m[0].split('-').map(Number);
-        break;
-      }
+    if (m) {
+      digits = m[0].split('-').map(Number);
     }
     if (digits.length < mode.digits) {
-      // fallback: use lucky numbers to build digits
       const pool = [...kyusei.luckyNums, ...dayLucky.nums];
       digits = Array.from({length: mode.digits}, (_, i) => pool[i % pool.length]);
     }
 
+    // ===== ボールを先に表示 =====
     const resultsArea = document.getElementById('resultsArea');
     const div = document.createElement('div');
     div.className = 'result-set';
+    div.id = 'numbers-result';
     div.innerHTML = `
       <div class="result-set-header">
         <span class="set-label">${dateStr}</span>
@@ -1198,14 +1190,57 @@ async function generateNumbers() {
         <span style="font-size:0.7rem;padding:3px 8px;background:#f0eaf8;color:#6b3fa0;border-radius:20px;border:1px solid #d0b8f0;">${kyusei.dayStar}</span>
         <span style="font-size:0.7rem;padding:3px 8px;background:#e6f5ec;color:#00963c;border-radius:20px;border:1px solid #a8dfc0;">吉数：${kyusei.luckyNums.join('・')}</span>
       </div>
-      <div class="ai-comment">
-        <div class="ai-comment-header">✦ 月齢×九星×曜日 総合解説 — ${MODELS[currentModel]}</div>
-        <div style="color:#111;font-size:0.85rem;line-height:1.7;">${result.trim().split('\n').join('<br>')}</div>
+      <div id="numbers-comment">
+        <div class="loading-dots" style="padding:10px 0">
+          <div class="loading-dot"></div>
+          <div class="loading-dot"></div>
+          <div class="loading-dot"></div>
+        </div>
       </div>
     `;
     resultsArea.appendChild(div);
+    document.getElementById('loadingArea').style.display = 'none';
+
+    // ===== Step2: 解説を生成 =====
+    const prompt2 = `あなたは月齢・九星気学・曜日吉数の専門家です。以下の情報と予測番号をもとに、根拠の解説を日本語で書いてください。
+
+【抽選日情報】
+・日付：${dateStr}
+・月齢：${moonAge}日（${moonPhase}）
+・年の九星：${kyusei.yearStar}
+・日の九星：${kyusei.dayStar}
+・九星の吉数：${kyusei.luckyNums.join('、')}
+・曜日の吉数：${dayLucky.nums.join('、')}（${dayLucky.reason}）
+・予測番号：${digits.join('-')}
+
+【解説の構成】
+1. 月齢フェーズの特性（2〜3文）
+2. 九星気学の組み合わせと吉数（2〜3文）
+3. 曜日吉数との総合判断（2〜3文）
+4. なぜこの番号になったか（1〜2文）
+
+番号の導出理由が明確になるよう解説してください。`;
+
+    try {
+      const result2 = await callAPI(prompt2);
+      document.getElementById('numbers-comment').innerHTML = `
+        <div class="ai-comment">
+          <div class="ai-comment-header">✦ 月齢×九星×曜日 総合解説 — ${MODELS[currentModel]}</div>
+          <div style="color:#111;font-size:0.85rem;line-height:1.7;">${result2.trim().split('\n').join('<br>')}</div>
+        </div>
+      `;
+    } catch(e) {
+      document.getElementById('numbers-comment').innerHTML = `
+        <div class="ai-comment">
+          <div class="ai-comment-header">✦ 解説</div>
+          <div style="color:#111;font-size:0.85rem;">⚠️ 解説生成エラー: ${e.message}</div>
+        </div>
+      `;
+    }
+
   } catch(e) {
     showError('エラー: ' + e.message);
+    document.getElementById('loadingArea').style.display = 'none';
   }
   document.getElementById('loadingArea').style.display = 'none';
   btn.disabled = false;
