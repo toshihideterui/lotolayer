@@ -727,18 +727,14 @@
 
   <!-- Numbers input card (shown only for num3/num4) -->
   <div class="card" id="numbersInputCard" style="display:none;">
-    <div class="card-title">数秘術 情報入力</div>
+    <div class="card-title">抽選日を選択</div>
     <div class="numbers-form">
       <div class="nf-row">
-        <label class="nf-label">お名前</label>
-        <input type="text" class="api-input" id="userName" placeholder="例：山田太郎" />
-      </div>
-      <div class="nf-row">
-        <label class="nf-label">生年月日</label>
-        <input type="date" class="api-input" id="userBirthday" />
+        <label class="nf-label">抽選日</label>
+        <input type="date" class="api-input" id="drawDate" />
       </div>
     </div>
-    <p class="api-note" style="margin-top:8px;">※ 今日の日付と組み合わせて数秘術的なラッキーナンバーを導き出します</p>
+    <p class="api-note" style="margin-top:8px;">※ 月齢・九星気学・曜日を組み合わせてその日のラッキーナンバーを導き出します</p>
   </div>
 
   <!-- Model Select -->
@@ -1048,53 +1044,125 @@ function toggleKey(id, btn) {
 }
 
 // ===== Numbers prediction =====
+// ===== 月齢計算 =====
+function getMoonAge(date) {
+  // 既知の新月日からの経過日数で月齢を計算
+  const knownNewMoon = new Date(2000, 0, 6); // 2000年1月6日が新月
+  const diff = (date - knownNewMoon) / (1000 * 60 * 60 * 24);
+  const moonCycle = 29.53059;
+  const age = diff % moonCycle;
+  return Math.round((age < 0 ? age + moonCycle : age) * 10) / 10;
+}
+
+function getMoonPhase(age) {
+  if (age < 1.85) return '新月（再生・新スタート）';
+  if (age < 7.38) return '三日月（成長・積み上げ）';
+  if (age < 9.22) return '上弦の月（決断・行動）';
+  if (age < 14.77) return '十三夜（加速・充実）';
+  if (age < 16.61) return '満月（完成・感謝・直感最大）';
+  if (age < 22.15) return '十六夜（手放し・整理）';
+  if (age < 23.99) return '下弦の月（内省・見直し）';
+  return '晦日月（浄化・準備）';
+}
+
+// ===== 九星計算 =====
+function getKyusei(date) {
+  // 九星気学：年の九星（節分基準）
+  const year = date.getMonth() < 1 || (date.getMonth() === 1 && date.getDate() < 4)
+    ? date.getFullYear() - 1 : date.getFullYear();
+  const base = (11 - ((year - 1) % 9)) % 9;
+  const yearStar = base === 0 ? 9 : base;
+
+  // 日の九星
+  const epoch = new Date(1899, 0, 21); // 一白水星の基準日
+  const dayDiff = Math.floor((date - epoch) / (1000 * 60 * 60 * 24));
+  const dayStarNum = ((8 - (dayDiff % 9)) % 9) + 1;
+
+  const stars = ['','一白水星','二黒土星','三碧木星','四緑木星','五黄土星','六白金星','七赤金星','八白土星','九紫火星'];
+  const luckyNums = {1:[1,6], 2:[2,5,8], 3:[3,4], 4:[3,4], 5:[2,5,8], 6:[6,7], 7:[6,7], 8:[2,5,8], 9:[9]};
+
+  return {
+    yearStar: stars[yearStar],
+    dayStar: stars[dayStarNum],
+    luckyNums: [...new Set([...luckyNums[yearStar], ...luckyNums[dayStarNum]])]
+  };
+}
+
+// ===== 曜日の吉数 =====
+function getDayLucky(date) {
+  const dayNames = ['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日'];
+  const dayLucky = {
+    0: { nums: [0,9], reason: '日曜：太陽の日。完全数9と循環の0が吉' },
+    1: { nums: [1,7], reason: '月曜：月の日。新しい始まり1と幸運7が吉' },
+    2: { nums: [2,8], reason: '火曜：火星の日。対極2と繁栄8が吉' },
+    3: { nums: [3,6], reason: '水曜：水星の日。創造3と調和6が吉' },
+    4: { nums: [4,5], reason: '木曜：木星の日。安定4と変化5が吉' },
+    5: { nums: [5,8], reason: '金曜：金星の日。変化5と豊穣8が吉' },
+    6: { nums: [3,7], reason: '土曜：土星の日。創造3と幸運7が吉' }
+  };
+  const dow = date.getDay();
+  return { dayName: dayNames[dow], ...dayLucky[dow] };
+}
+
 async function generateNumbers() {
-  const name = document.getElementById('userName').value.trim();
-  const birthday = document.getElementById('userBirthday').value;
-  if (!name || !birthday) {
-    showError('お名前と生年月日を入力してください');
+  const drawDateVal = document.getElementById('drawDate').value;
+  if (!drawDateVal) {
+    showError('抽選日を選択してください');
     return;
   }
+
   const mode = MODES[currentMode];
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+  const drawDate = new Date(drawDateVal + 'T12:00:00');
+
+  // Calculate moon age, kyusei, day lucky
+  const moonAge = getMoonAge(drawDate);
+  const moonPhase = getMoonPhase(moonAge);
+  const kyusei = getKyusei(drawDate);
+  const dayLucky = getDayLucky(drawDate);
+  const dateStr = `${drawDate.getFullYear()}年${drawDate.getMonth()+1}月${drawDate.getDate()}日（${dayLucky.dayName}）`;
+
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
   document.getElementById('loadingArea').style.display = '';
   document.getElementById('errorArea').style.display = 'none';
   document.getElementById('resultsArea').innerHTML = '';
 
-  const prompt = `あなたは数秘術の専門家です。以下の情報をもとに${mode.name}（${mode.digits}桁、各桁0〜9）のラッキーナンバーを導き出してください。
+  const prompt = `あなたは月齢・九星気学・曜日吉数の専門家です。以下の情報をもとに${mode.name}（${mode.digits}桁、各桁0〜9のストレート）のラッキーナンバーを導き出してください。
 
-【情報】
-・名前：${name}
-・生年月日：${birthday}
-・今日の日付：${todayStr}
+【抽選日情報】
+・日付：${dateStr}
+・月齢：${moonAge}日（${moonPhase}）
+・年の九星：${kyusei.yearStar}
+・日の九星：${kyusei.dayStar}
+・九星の吉数：${kyusei.luckyNums.join('、')}
+・曜日の吉数：${dayLucky.nums.join('、')}（${dayLucky.reason}）
 
 【手順】
-1. 生年月日からライフパスナンバーを計算（各桁を足して1桁になるまで）
-2. 名前の各文字を五十音順の番号（あ=1、い=2...）に変換して合計し、1桁に
-3. 今日の日付の数字を合計して1桁に
-4. これらの数字の相性・組み合わせから${mode.digits}桁の番号（各桁0〜9）を導く
-5. 計算過程を簡潔に説明して、最後に「ラッキーナンバー：X-X-X${mode.digits===4?'-X':''}」の形式で答えてください
+1. 月齢フェーズの特性を説明する
+2. 九星気学の年星と日星の組み合わせから吉数を解説する
+3. 曜日の吉数との総合判断を行う
+4. これらを統合して${mode.digits}桁の番号（各桁0〜9）を導く
+5. 必ず最後の行に「予測番号：X-X-X${mode.digits===4?'-X':''}」の形式のみで出力する（Xは0〜9の数字）
 
-日本語で、わかりやすく楽しいトーンで答えてください。`;
+日本語で根拠を明確にしながら解説してください。`;
 
   try {
     const result = await callAPI(prompt);
-    // Extract digits from result
-    const match = result.match(/[0-9][-][0-9][-][0-9](?:[-][0-9])?/);
+
+    // Extract digits - look for X-X-X or X-X-X-X pattern at end
+    const lines = result.trim().split('\n');
     let digits = [];
-    if (match) {
-      digits = match[0].split('-').map(d => parseInt(d));
-    } else {
-      // fallback: find any sequence of digits separated by - or spaces
-      const nums = result.match(/[0-9]/g);
-      if (nums && nums.length >= mode.digits) {
-        digits = nums.slice(0, mode.digits).map(Number);
-      } else {
-        digits = Array.from({length: mode.digits}, () => Math.floor(Math.random()*10));
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const m = lines[i].match(/[0-9][-][0-9][-][0-9](?:[-][0-9])?/);
+      if (m) {
+        digits = m[0].split('-').map(Number);
+        break;
       }
+    }
+    if (digits.length < mode.digits) {
+      // fallback: use lucky numbers to build digits
+      const pool = [...kyusei.luckyNums, ...dayLucky.nums];
+      digits = Array.from({length: mode.digits}, (_, i) => pool[i % pool.length]);
     }
 
     const resultsArea = document.getElementById('resultsArea');
@@ -1102,7 +1170,7 @@ async function generateNumbers() {
     div.className = 'result-set';
     div.innerHTML = `
       <div class="result-set-header">
-        <span class="set-label">${name}さんの予測</span>
+        <span class="set-label">${dateStr}</span>
         <span class="set-type-badge ${mode.badge}">${mode.name}</span>
       </div>
       <div class="numbers-balls-row">
@@ -1111,8 +1179,13 @@ async function generateNumbers() {
           ${i < digits.length-1 ? '<div class="num-dash">–</div>' : ''}
         `).join('')}
       </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <span style="font-size:0.7rem;padding:3px 8px;background:#e8f0fb;color:#0057a8;border-radius:20px;border:1px solid #b8d0f0;">🌙 月齢${moonAge}日</span>
+        <span style="font-size:0.7rem;padding:3px 8px;background:#f0eaf8;color:#6b3fa0;border-radius:20px;border:1px solid #d0b8f0;">${kyusei.dayStar}</span>
+        <span style="font-size:0.7rem;padding:3px 8px;background:#e6f5ec;color:#00963c;border-radius:20px;border:1px solid #a8dfc0;">吉数：${kyusei.luckyNums.join('・')}</span>
+      </div>
       <div class="ai-comment">
-        <div class="ai-comment-header">✦ 数秘術による解説 — ${MODELS[currentModel]}</div>
+        <div class="ai-comment-header">✦ 月齢×九星×曜日 総合解説 — ${MODELS[currentModel]}</div>
         <div style="color:#111;font-size:0.85rem;line-height:1.7;">${result.trim().split('\n').join('<br>')}</div>
       </div>
     `;
