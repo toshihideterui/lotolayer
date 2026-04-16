@@ -737,10 +737,10 @@
     <p class="api-note" style="margin-top:8px;">※ 月齢・九星気学・曜日を組み合わせてその日のラッキーナンバーを導き出します</p>
   </div>
 
-  <!-- Model Select -->
+  <!-- Model + API (unified card) -->
   <div class="card">
-    <div class="card-title">AI モデル</div>
-    <div class="model-grid">
+    <div class="card-title">AI モデル / API キー</div>
+    <div class="model-grid" style="margin-bottom:14px;">
       <button class="model-btn active" onclick="selectModel('groq')" id="model-groq">
         <span class="model-dot"></span>Groq（llama-3.3-70b）
       </button>
@@ -748,23 +748,6 @@
         <span class="model-dot"></span>Gemma（gemma-4-31b-it）
       </button>
     </div>
-  </div>
-
-  <!-- Count & API -->
-  <div class="card" id="countCard">
-    <div class="card-title">生成セット数</div>
-    <div class="count-row">
-      <span class="count-label">何セット予測する？</span>
-      <div class="count-btns">
-        <button class="count-btn active" onclick="selectCount(1)" id="cnt-1">1</button>
-        <button class="count-btn" onclick="selectCount(2)" id="cnt-2">2</button>
-        <button class="count-btn" onclick="selectCount(3)" id="cnt-3">3</button>
-        <button class="count-btn" onclick="selectCount(5)" id="cnt-5">5</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
     <div class="api-row">
       <div class="api-col">
         <div class="api-col-label"><span class="api-icon">⚡</span> Groq APIキー</div>
@@ -781,7 +764,21 @@
         </div>
       </div>
     </div>
-    <p class="api-note">どちらか一方のAPIキーがあれば動作します。両方入力するとGroqを優先します。</p>
+    <p class="api-note" style="margin-top:8px;">どちらか一方のAPIキーがあれば動作します。両方入力するとGroqを優先します。</p>
+  </div>
+
+  <!-- Count -->
+  <div class="card" id="countCard">
+    <div class="card-title">生成セット数</div>
+    <div class="count-row">
+      <span class="count-label">何セット予測する？</span>
+      <div class="count-btns">
+        <button class="count-btn active" onclick="selectCount(1)" id="cnt-1">1</button>
+        <button class="count-btn" onclick="selectCount(2)" id="cnt-2">2</button>
+        <button class="count-btn" onclick="selectCount(3)" id="cnt-3">3</button>
+        <button class="count-btn" onclick="selectCount(5)" id="cnt-5">5</button>
+      </div>
+    </div>
   </div>
 
   <!-- Generate -->
@@ -1246,6 +1243,27 @@ async function generateNumbers() {
   btn.disabled = false;
 }
 
+// ===== Extract Japanese text from AI response =====
+function extractJapanese(text) {
+  // Split by lines and find lines that are mostly Japanese
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const jpLines = [];
+  for (const line of lines) {
+    // Count Japanese characters (hiragana, katakana, kanji)
+    const jpChars = (line.match(/[\u3040-\u9fff]/g) || []).length;
+    const ratio = jpChars / line.length;
+    // Keep lines that are at least 30% Japanese and don't look like thinking markers
+    if (ratio >= 0.3 && !line.startsWith('*') && !line.startsWith('-') && !line.includes('Draft') && !line.includes('Selection:') && !line.includes('Constraint')) {
+      jpLines.push(line);
+    }
+  }
+  if (jpLines.length > 0) return jpLines.join('<br>');
+  // Fallback: return last 2-3 sentences that contain Japanese
+  const jpSentences = text.match(/[^。！？]*[\u3040-\u9fff][^。！？]*[。！？]/g) || [];
+  if (jpSentences.length > 0) return jpSentences.slice(-3).join('');
+  return text.trim();
+}
+
 // ===== Generate =====
 async function generate() {
   // Route to numbers generator if needed
@@ -1324,11 +1342,13 @@ async function generate() {
 頻度データ: ${freqInfo}`;
 
     try {
-      const comment = await callAPI(prompt);
+      const rawComment = await callAPI(prompt);
+      // Extract Japanese only: find last Japanese sentence block
+      const comment = extractJapanese(rawComment);
       document.getElementById(`comment-${i}`).innerHTML = `
         <div class="ai-comment">
           <div class="ai-comment-header">AI予測コメント — ${MODELS[currentModel]}</div>
-          ${comment.trim()}
+          ${comment}
         </div>
       `;
     } catch(e) {
