@@ -150,6 +150,10 @@
     gap: 8px;
   }
 
+  .mode-tabs-5 {
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  }
+
   .mode-tab {
     background: #f5f7fc;
     border: 1px solid var(--border);
@@ -350,6 +354,8 @@
   .badge-loto6 { background: #e8f0fb; color: #0057a8; border: 1px solid #b8d0f0; }
   .badge-loto7 { background: #f0eaf8; color: #6b3fa0; border: 1px solid #d0b8f0; }
   .badge-mini  { background: #e6f5ec; color: #00963c; border: 1px solid #a8dfc0; }
+  .badge-num3  { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+  .badge-num4  { background: #fce4ec; color: #c62828; border: 1px solid #f48fb1; }
 
   /* Lottery balls */
   .balls-row {
@@ -582,6 +588,70 @@
     line-height: 1.5;
   }
 
+  /* Numbers form */
+  .numbers-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .nf-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .nf-label {
+    font-size: 0.78rem;
+    color: var(--blue);
+    font-weight: 700;
+  }
+
+  /* Numbers result balls */
+  .numbers-balls-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+
+  .num-ball {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 1.3rem;
+    font-weight: 900;
+    background: radial-gradient(circle at 35% 35%, #4da8ff, #0044aa);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0,87,168,0.3);
+    position: relative;
+    animation: ballPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  }
+
+  .num-ball::after {
+    content: '';
+    position: absolute;
+    top: 7px;
+    left: 11px;
+    width: 14px;
+    height: 8px;
+    background: rgba(255,255,255,0.4);
+    border-radius: 50%;
+    transform: rotate(-30deg);
+  }
+
+  .num-dash {
+    display: flex;
+    align-items: center;
+    font-size: 1.5rem;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
 
 </style>
 </head>
@@ -616,13 +686,13 @@
       </svg>
     </div>
     <h1>LOTO LAYER</h1>
-    <p>統計 × AI 予測 ｜ ロト6 / ロト7 / ミニロト</p>
+    <p>統計 × AI 予測 ｜ ロト6 / ロト7 / ミニロト / ナンバーズ</p>
   </div>
 
   <!-- Mode Select -->
   <div class="card">
     <div class="card-title">ロトの種類</div>
-    <div class="mode-tabs">
+    <div class="mode-tabs mode-tabs-5">
       <button class="mode-tab active" onclick="selectMode('loto6')" id="tab-loto6">
         <span class="tab-name">LOTO 6</span>
         <span class="tab-desc">1〜43 / 6個</span>
@@ -635,7 +705,31 @@
         <span class="tab-name">MINI</span>
         <span class="tab-desc">1〜31 / 5個</span>
       </button>
+      <button class="mode-tab" onclick="selectMode('num3')" id="tab-num3">
+        <span class="tab-name">N3</span>
+        <span class="tab-desc">ナンバーズ3</span>
+      </button>
+      <button class="mode-tab" onclick="selectMode('num4')" id="tab-num4">
+        <span class="tab-name">N4</span>
+        <span class="tab-desc">ナンバーズ4</span>
+      </button>
     </div>
+  </div>
+
+  <!-- Numbers input card (shown only for num3/num4) -->
+  <div class="card" id="numbersInputCard" style="display:none;">
+    <div class="card-title">数秘術 情報入力</div>
+    <div class="numbers-form">
+      <div class="nf-row">
+        <label class="nf-label">お名前</label>
+        <input type="text" class="api-input" id="userName" placeholder="例：山田太郎" />
+      </div>
+      <div class="nf-row">
+        <label class="nf-label">生年月日</label>
+        <input type="date" class="api-input" id="userBirthday" />
+      </div>
+    </div>
+    <p class="api-note" style="margin-top:8px;">※ 今日の日付と組み合わせて数秘術的なラッキーナンバーを導き出します</p>
   </div>
 
   <!-- Model Select -->
@@ -652,7 +746,7 @@
   </div>
 
   <!-- Count & API -->
-  <div class="card">
+  <div class="card" id="countCard">
     <div class="card-title">生成セット数</div>
     <div class="count-row">
       <span class="count-label">何セット予測する？</span>
@@ -726,7 +820,9 @@ let currentCount = 1;
 const MODES = {
   loto6: { max: 43, pick: 6, name: 'ロト6', badge: 'badge-loto6' },
   loto7: { max: 37, pick: 7, name: 'ロト7', badge: 'badge-loto7' },
-  mini:  { max: 31, pick: 5, name: 'ミニロト', badge: 'badge-mini' }
+  mini:  { max: 31, pick: 5, name: 'ミニロト', badge: 'badge-mini' },
+  num3:  { digits: 3, name: 'ナンバーズ3', badge: 'badge-num3' },
+  num4:  { digits: 4, name: 'ナンバーズ4', badge: 'badge-num4' }
 };
 
 const MODELS = {
@@ -771,9 +867,11 @@ function selectMode(mode) {
   const colors = {
     loto6: { border: '#0057a8', bg: '#e8f0fb', text: '#0057a8' },
     loto7: { border: '#6b3fa0', bg: '#f0eaf8', text: '#6b3fa0' },
-    mini:  { border: '#00963c', bg: '#e6f5ec', text: '#00963c' }
+    mini:  { border: '#00963c', bg: '#e6f5ec', text: '#00963c' },
+    num3:  { border: '#e65100', bg: '#fff3e0', text: '#e65100' },
+    num4:  { border: '#c62828', bg: '#fce4ec', text: '#c62828' }
   };
-  ['loto6','loto7','mini'].forEach(m => {
+  ['loto6','loto7','mini','num3','num4'].forEach(m => {
     const tab = document.getElementById('tab-'+m);
     tab.classList.toggle('active', m === mode);
     if (m === mode) {
@@ -789,7 +887,12 @@ function selectMode(mode) {
       tab.style.boxShadow = '';
     }
   });
-  renderStats();
+  // Show/hide numbers input card and stats
+  const isNumbers = (mode === 'num3' || mode === 'num4');
+  document.getElementById('numbersInputCard').style.display = isNumbers ? '' : 'none';
+  document.getElementById('countCard').style.display = isNumbers ? 'none' : '';
+  document.getElementById('statsCard').style.display = 'none';
+  if (!isNumbers) renderStats();
 }
 
 function selectModel(model) {
@@ -935,8 +1038,90 @@ function toggleKey(id, btn) {
   }
 }
 
+// ===== Numbers prediction =====
+async function generateNumbers() {
+  const name = document.getElementById('userName').value.trim();
+  const birthday = document.getElementById('userBirthday').value;
+  if (!name || !birthday) {
+    showError('お名前と生年月日を入力してください');
+    return;
+  }
+  const mode = MODES[currentMode];
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  document.getElementById('loadingArea').style.display = '';
+  document.getElementById('errorArea').style.display = 'none';
+  document.getElementById('resultsArea').innerHTML = '';
+
+  const prompt = `あなたは数秘術の専門家です。以下の情報をもとに${mode.name}（${mode.digits}桁、各桁0〜9）のラッキーナンバーを導き出してください。
+
+【情報】
+・名前：${name}
+・生年月日：${birthday}
+・今日の日付：${todayStr}
+
+【手順】
+1. 生年月日からライフパスナンバーを計算（各桁を足して1桁になるまで）
+2. 名前の各文字を五十音順の番号（あ=1、い=2...）に変換して合計し、1桁に
+3. 今日の日付の数字を合計して1桁に
+4. これらの数字の相性・組み合わせから${mode.digits}桁の番号（各桁0〜9）を導く
+5. 計算過程を簡潔に説明して、最後に「ラッキーナンバー：X-X-X${mode.digits===4?'-X':''}」の形式で答えてください
+
+日本語で、わかりやすく楽しいトーンで答えてください。`;
+
+  try {
+    const result = await callAPI(prompt);
+    // Extract digits from result
+    const match = result.match(/[0-9][-][0-9][-][0-9](?:[-][0-9])?/);
+    let digits = [];
+    if (match) {
+      digits = match[0].split('-').map(d => parseInt(d));
+    } else {
+      // fallback: find any sequence of digits separated by - or spaces
+      const nums = result.match(/[0-9]/g);
+      if (nums && nums.length >= mode.digits) {
+        digits = nums.slice(0, mode.digits).map(Number);
+      } else {
+        digits = Array.from({length: mode.digits}, () => Math.floor(Math.random()*10));
+      }
+    }
+
+    const resultsArea = document.getElementById('resultsArea');
+    const div = document.createElement('div');
+    div.className = 'result-set';
+    div.innerHTML = `
+      <div class="result-set-header">
+        <span class="set-label">${name}さんの予測</span>
+        <span class="set-type-badge ${mode.badge}">${mode.name}</span>
+      </div>
+      <div class="numbers-balls-row">
+        ${digits.map((d,i) => `
+          <div class="num-ball" style="animation-delay:${i*0.1}s">${d}</div>
+          ${i < digits.length-1 ? '<div class="num-dash">–</div>' : ''}
+        `).join('')}
+      </div>
+      <div class="ai-comment">
+        <div class="ai-comment-header">✦ 数秘術による解説 — ${MODELS[currentModel]}</div>
+        <div style="color:#111;font-size:0.85rem;line-height:1.7;">${result.trim().split('\n').join('<br>')}</div>
+      </div>
+    `;
+    resultsArea.appendChild(div);
+  } catch(e) {
+    showError('エラー: ' + e.message);
+  }
+  document.getElementById('loadingArea').style.display = 'none';
+  btn.disabled = false;
+}
+
 // ===== Generate =====
 async function generate() {
+  // Route to numbers generator if needed
+  if (currentMode === 'num3' || currentMode === 'num4') {
+    return generateNumbers();
+  }
+
   const groqKey = document.getElementById('groqKey').value.trim();
   const gemmaKey = document.getElementById('gemmaKey').value.trim();
   if (!groqKey && !gemmaKey) {
