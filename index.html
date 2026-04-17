@@ -684,6 +684,14 @@
     box-shadow: 0 3px 10px rgba(0,87,168,0.4);
   }
 
+  .perm-section-title {
+    font-size: 0.78rem;
+    color: var(--blue);
+    font-weight: 700;
+    margin: 14px 0 8px;
+    letter-spacing: 0.02em;
+  }
+
   .perm-sep {
     color: var(--muted);
     font-size: 1rem;
@@ -1096,6 +1104,16 @@ function scorePermutation(perm, luckyNums) {
   return score;
 }
 
+// ===== 組み合わせ生成（ボックス用）=====
+function combinations(arr, r) {
+  if (r === 0) return [[]];
+  if (arr.length < r) return [];
+  const [first, ...rest] = arr;
+  const withFirst = combinations(rest, r - 1).map(c => [first, ...c]);
+  const withoutFirst = combinations(rest, r);
+  return [...withFirst, ...withoutFirst];
+}
+
 // ===== 月齢計算 =====
 function getMoonAge(date) {
   // 既知の新月日からの経過日数で月齢を計算
@@ -1241,6 +1259,7 @@ async function generateNumbers() {
         <span style="font-size:0.7rem;padding:3px 8px;background:#f0eaf8;color:#6b3fa0;border-radius:20px;border:1px solid #d0b8f0;">${kyusei.dayStar}</span>
         <span style="font-size:0.7rem;padding:3px 8px;background:#e6f5ec;color:#00963c;border-radius:20px;border:1px solid #a8dfc0;">吉数：${luckyPool.join('・')}</span>
       </div>
+      <div class="perm-section-title">🎯 ストレート（全順列・当たりやすい順）</div>
       <div class="perm-list">
         ${allPerms.map((perm, idx) => `
           <div class="perm-row ${idx === 0 ? 'perm-row-top' : ''}">
@@ -1253,6 +1272,23 @@ async function generateNumbers() {
             </div>
           </div>
         `).join('')}
+      </div>
+      <div class="perm-section-title">📦 ボックス（吉数から${mode.digits}桁の組み合わせ・小さい順）</div>
+      <div class="perm-list">
+        ${combinations(luckyPool.slice(0, Math.min(luckyPool.length, 6)), mode.digits)
+          .map(c => [...c].sort((a,b) => a-b))
+          .filter((c, i, arr) => arr.findIndex(x => x.join('-') === c.join('-')) === i)
+          .map((combo, idx) => `
+            <div class="perm-row">
+              <span class="perm-rank">${idx + 1}</span>
+              <div class="perm-balls">
+                ${combo.map((d, i) => `
+                  <div class="perm-ball perm-ball-lucky">${d}</div>
+                  ${i < combo.length - 1 ? '<span class="perm-sep">–</span>' : ''}
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
       </div>
       <div id="numbers-comment">
         <div class="loading-dots" style="padding:10px 0">
