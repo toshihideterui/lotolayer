@@ -616,6 +616,79 @@
     font-weight: 700;
   }
 
+  /* Permutation list */
+  .perm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .perm-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #f5f7fc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: background 0.2s;
+  }
+
+  .perm-row-top {
+    background: #e8f0fb;
+    border-color: var(--blue);
+    box-shadow: 0 2px 8px rgba(0,87,168,0.1);
+  }
+
+  .perm-rank {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    width: 20px;
+    flex-shrink: 0;
+  }
+
+  .perm-row-top .perm-rank {
+    color: var(--blue);
+    font-weight: 700;
+  }
+
+  .perm-balls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .perm-ball {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    background: #dde4f0;
+    color: #6b7a99;
+  }
+
+  .perm-ball-lucky {
+    background: radial-gradient(circle at 35% 35%, #4da8ff, #0044aa);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(0,87,168,0.3);
+  }
+
+  .perm-row-top .perm-ball-lucky {
+    box-shadow: 0 3px 10px rgba(0,87,168,0.4);
+  }
+
+  .perm-sep {
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
   /* Numbers result balls */
   .numbers-balls-row {
     display: flex;
@@ -997,6 +1070,32 @@ function toggleKey(id, btn) {
 }
 
 // ===== Numbers prediction =====
+// ===== 全順列生成 =====
+function permutations(arr) {
+  if (arr.length <= 1) return [arr];
+  const result = [];
+  for (let i = 0; i < arr.length; i++) {
+    const rest = [...arr.slice(0, i), ...arr.slice(i + 1)];
+    for (const perm of permutations(rest)) {
+      result.push([arr[i], ...perm]);
+    }
+  }
+  return result;
+}
+
+// 吉数の優先度スコアで並び替え（吉数が先頭に来るほど高スコア）
+function scorePermutation(perm, luckyNums) {
+  let score = 0;
+  perm.forEach((d, i) => {
+    const luckyRank = luckyNums.indexOf(d);
+    if (luckyRank !== -1) {
+      // 先頭に近いほど高スコア、吉数の順位も考慮
+      score += (perm.length - i) * 10 + (luckyNums.length - luckyRank);
+    }
+  });
+  return score;
+}
+
 // ===== 月齢計算 =====
 function getMoonAge(date) {
   // 既知の新月日からの経過日数で月齢を計算
@@ -1122,6 +1221,11 @@ async function generateNumbers() {
       digits = Array.from({length: mode.digits}, (_, i) => pool[i % pool.length]);
     }
 
+    // ===== 全順列を優先度順に並べる =====
+    const allPerms = permutations(digits);
+    const luckyPool = [...new Set([...kyusei.luckyNums, ...dayLucky.nums])];
+    allPerms.sort((a, b) => scorePermutation(b, luckyPool) - scorePermutation(a, luckyPool));
+
     // ===== ボールを先に表示 =====
     const resultsArea = document.getElementById('resultsArea');
     const div = document.createElement('div');
@@ -1132,16 +1236,23 @@ async function generateNumbers() {
         <span class="set-label">${dateStr}</span>
         <span class="set-type-badge ${mode.badge}">${mode.name}</span>
       </div>
-      <div class="numbers-balls-row">
-        ${digits.map((d,i) => `
-          <div class="num-ball" style="animation-delay:${i*0.1}s">${d}</div>
-          ${i < digits.length-1 ? '<div class="num-dash">–</div>' : ''}
-        `).join('')}
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
         <span style="font-size:0.7rem;padding:3px 8px;background:#e8f0fb;color:#0057a8;border-radius:20px;border:1px solid #b8d0f0;">🌙 月齢${moonAge}日</span>
         <span style="font-size:0.7rem;padding:3px 8px;background:#f0eaf8;color:#6b3fa0;border-radius:20px;border:1px solid #d0b8f0;">${kyusei.dayStar}</span>
-        <span style="font-size:0.7rem;padding:3px 8px;background:#e6f5ec;color:#00963c;border-radius:20px;border:1px solid #a8dfc0;">吉数：${kyusei.luckyNums.join('・')}</span>
+        <span style="font-size:0.7rem;padding:3px 8px;background:#e6f5ec;color:#00963c;border-radius:20px;border:1px solid #a8dfc0;">吉数：${luckyPool.join('・')}</span>
+      </div>
+      <div class="perm-list">
+        ${allPerms.map((perm, idx) => `
+          <div class="perm-row ${idx === 0 ? 'perm-row-top' : ''}">
+            <span class="perm-rank">${idx + 1}</span>
+            <div class="perm-balls">
+              ${perm.map((d, i) => `
+                <div class="perm-ball ${luckyPool.includes(d) ? 'perm-ball-lucky' : ''}">${d}</div>
+                ${i < perm.length - 1 ? '<span class="perm-sep">–</span>' : ''}
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
       </div>
       <div id="numbers-comment">
         <div class="loading-dots" style="padding:10px 0">
