@@ -1104,14 +1104,17 @@ function scorePermutation(perm, luckyNums) {
   return score;
 }
 
-// ===== 組み合わせ生成（ボックス用）=====
-function combinations(arr, r) {
+// ===== 組み合わせ生成（ボックス用・重複あり）=====
+function combinationsWithRepeat(arr, r) {
   if (r === 0) return [[]];
-  if (arr.length < r) return [];
-  const [first, ...rest] = arr;
-  const withFirst = combinations(rest, r - 1).map(c => [first, ...c]);
-  const withoutFirst = combinations(rest, r);
-  return [...withFirst, ...withoutFirst];
+  const result = [];
+  for (let i = 0; i < arr.length; i++) {
+    const rest = combinationsWithRepeat(arr.slice(i), r - 1);
+    for (const c of rest) {
+      result.push([arr[i], ...c]);
+    }
+  }
+  return result;
 }
 
 // ===== 月齢計算 =====
@@ -1273,11 +1276,22 @@ async function generateNumbers() {
           </div>
         `).join('')}
       </div>
-      <div class="perm-section-title">📦 ボックス（吉数から${mode.digits}桁の組み合わせ・小さい順）</div>
+      <div class="perm-section-title">📦 ボックス（吉数から${mode.digits}桁・重複あり・小さい順・上位20通り）</div>
       <div class="perm-list">
-        ${combinations(luckyPool.slice(0, Math.min(luckyPool.length, 6)), mode.digits)
+        ${combinationsWithRepeat(luckyPool.slice(0, Math.min(luckyPool.length, 6)), mode.digits)
           .map(c => [...c].sort((a,b) => a-b))
           .filter((c, i, arr) => arr.findIndex(x => x.join('-') === c.join('-')) === i)
+          .sort((a, b) => {
+            // 吉数が多く含まれる順、同じなら小さい数字優先
+            const aScore = a.filter(d => luckyPool.includes(d)).length;
+            const bScore = b.filter(d => luckyPool.includes(d)).length;
+            if (bScore !== aScore) return bScore - aScore;
+            for (let i = 0; i < a.length; i++) {
+              if (a[i] !== b[i]) return a[i] - b[i];
+            }
+            return 0;
+          })
+          .slice(0, 20)
           .map((combo, idx) => `
             <div class="perm-row">
               <span class="perm-rank">${idx + 1}</span>
