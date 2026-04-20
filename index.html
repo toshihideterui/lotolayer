@@ -111,6 +111,26 @@
     letter-spacing: 0.05em;
   }
 
+  .live-btn {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 9px 20px;
+    background: linear-gradient(135deg, #cc0000, #ff3333);
+    color: #fff;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border-radius: 20px;
+    text-decoration: none;
+    box-shadow: 0 3px 12px rgba(200,0,0,0.35);
+    letter-spacing: 0.05em;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .live-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(200,0,0,0.45);
+  }
+
   /* Section card */
   .card {
     background: var(--white);
@@ -777,6 +797,9 @@
     </div>
     <h1>LOTO LAYER</h1>
     <p>統計 × AI 予測 ｜ ロト6 / ロト7 / ミニロト / ナンバーズ</p>
+    <a href="https://takarakuji.webcdn.stream.ne.jp/www11/takarakuji/live/index.html" target="_blank" class="live-btn">
+      🔴 抽選ライブを見る
+    </a>
   </div>
 
   <!-- Mode Select -->
