@@ -111,26 +111,6 @@
     letter-spacing: 0.05em;
   }
 
-  .live-btn {
-    display: inline-block;
-    margin-top: 14px;
-    padding: 9px 20px;
-    background: linear-gradient(135deg, #cc0000, #ff3333);
-    color: #fff;
-    font-family: 'Noto Sans JP', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 700;
-    border-radius: 20px;
-    text-decoration: none;
-    box-shadow: 0 3px 12px rgba(200,0,0,0.35);
-    letter-spacing: 0.05em;
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
-  .live-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(200,0,0,0.45);
-  }
-
   /* Section card */
   .card {
     background: var(--white);
@@ -797,9 +777,6 @@
     </div>
     <h1>LOTO LAYER</h1>
     <p>統計 × AI 予測 ｜ ロト6 / ロト7 / ミニロト / ナンバーズ</p>
-    <a href="https://takarakuji.webcdn.stream.ne.jp/www11/takarakuji/live/index.html" target="_blank" class="live-btn">
-      🔴 抽選ライブを見る
-    </a>
   </div>
 
   <!-- Mode Select -->
@@ -860,6 +837,7 @@
         <button class="count-btn active" onclick="selectCount(1)" id="cnt-1">1</button>
         <button class="count-btn" onclick="selectCount(2)" id="cnt-2">2</button>
         <button class="count-btn" onclick="selectCount(3)" id="cnt-3">3</button>
+        <button class="count-btn" onclick="selectCount(4)" id="cnt-4">4</button>
         <button class="count-btn" onclick="selectCount(5)" id="cnt-5">5</button>
       </div>
     </div>
@@ -989,7 +967,7 @@ function selectModel(model) {
 
 function selectCount(n) {
   currentCount = n;
-  [1,2,3,5].forEach(c => {
+  [1,2,3,4,5].forEach(c => {
     document.getElementById('cnt-'+c).classList.toggle('active', c === n);
   });
 }
