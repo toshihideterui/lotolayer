@@ -1017,26 +1017,28 @@ function renderStats() {
   }
 }
 
-// ===== Weighted random pick (balanced: odd/even + sum range) =====
+// ===== Weighted random pick (緩やかなバランス調整) =====
 function weightedPick(mode) {
   const m = MODES[mode];
   const freq = getFreq(mode);
 
-  // Sum target ranges per mode
-  const sumRanges = {
-    loto6: [100, 170],
-    loto7: [90, 160],
-    mini:  [50, 100]
-  };
-  const [sumMin, sumMax] = sumRanges[mode] || [50, 200];
+  // 出現頻度に少しランダム性を加えた重みを作成（固定パターンを避ける）
+  function buildWeights(available) {
+    return available.map(n => {
+      const f = freq[n];
+      // 頻度に±15%のランダムゆらぎを加える
+      const jitter = 0.85 + Math.random() * 0.3;
+      return f * jitter;
+    });
+  }
 
-  // Try up to 30 times to get a balanced combination
-  for (let attempt = 0; attempt < 30; attempt++) {
+  // 最大10回試行して「全数字が同じ十の位に偏っていない」組み合わせを選ぶ
+  for (let attempt = 0; attempt < 10; attempt++) {
     const picked = [];
     const available = Array.from({length: m.max}, (_,i) => i+1);
 
     while (picked.length < m.pick) {
-      const weights = available.map(n => freq[n]);
+      const weights = buildWeights(available);
       const wTotal = weights.reduce((a,b) => a+b, 0);
       let r = Math.random() * wTotal;
       let idx = 0;
@@ -1048,24 +1050,22 @@ function weightedPick(mode) {
       available.splice(idx, 1);
     }
 
-    const total = picked.reduce((a,b) => a+b, 0);
-    const oddCount = picked.filter(n => n % 2 === 1).length;
-    const evenCount = picked.length - oddCount;
+    // 緩やかなチェック：同じ十の位が3つ以上固まっていないか
+    const decades = picked.map(n => Math.floor((n-1) / 10));
+    const decadeCount = {};
+    decades.forEach(d => decadeCount[d] = (decadeCount[d] || 0) + 1);
+    const maxDecade = Math.max(...Object.values(decadeCount));
 
-    // Accept if sum in range AND odd/even roughly balanced (allow 1 diff)
-    const balanced = Math.abs(oddCount - evenCount) <= (m.pick > 5 ? 2 : 1);
-    const sumOk = total >= sumMin && total <= sumMax;
-
-    if (balanced && sumOk) {
+    if (maxDecade <= 3) {
       return { main: picked.sort((a,b)=>a-b) };
     }
   }
 
-  // Fallback: just return last attempt
+  // フォールバック：制限なしで返す
   const picked = [];
   const available = Array.from({length: m.max}, (_,i) => i+1);
   while (picked.length < m.pick) {
-    const weights = available.map(n => freq[n]);
+    const weights = buildWeights(available);
     const wTotal = weights.reduce((a,b) => a+b, 0);
     let r = Math.random() * wTotal;
     let idx = 0;
@@ -1077,6 +1077,11 @@ function weightedPick(mode) {
     available.splice(idx, 1);
   }
   return { main: picked.sort((a,b)=>a-b) };
+}
+
+function buildWeights(available) {
+  // フォールバック用（スコープ外でも使えるよう定義）
+  return available.map(() => 1);
 }
 
 // ===== API call =====
@@ -1490,24 +1495,9 @@ async function generate() {
     const s = sets[i];
     const freq = getFreq(currentMode);
     const freqInfo = s.main.map(n => `${n}番(出現${freq[n]}回)`).join('、');
-    const allFreq = freq.slice(1).map((f,i) => `${i+1}:${f}回`).join(' ');
-    const nums = s.main;
-    const oddCount = nums.filter(n => n % 2 === 1).length;
-    const evenCount = nums.length - oddCount;
-    const total = nums.reduce((a,b) => a+b, 0);
-    const prompt = `あなたはロト予測の専門家です。以下の予測数字について、統計的根拠を含む鋭い分析コメントを日本語で2〜3文だけ書いてください。
-
-【予測数字】${nums.join(', ')}（${mode.name}）
-【各数字の出現回数】${freqInfo}
-【奇数】${oddCount}個 【偶数】${evenCount}個
-【合計値】${total}
-
-以下の観点を含めてください：
-- 出現頻度が高い・低い数字のバランス評価
-- 奇数・偶数バランスの評価（理想は半々）
-- 合計値の評価（ロト6は100〜170、ロト7は90〜160、ミニロトは50〜100が当選に多い）
-
-思考過程・下書き・英語は不要です。日本語のコメント文のみ出力してください。`;
+    const prompt = `以下のロト予測数字について、運気・統計・直感を絡めた楽しいコメントを日本語で2〜3文だけ書いてください。思考過程や下書きは不要です。日本語のコメント文のみ出力してください。
+数字: ${s.main.join(', ')}（${mode.name}）
+頻度データ: ${freqInfo}`;
 
     try {
       const rawComment = await callAPI(prompt);
