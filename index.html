@@ -962,7 +962,7 @@ function selectMode(mode) {
   const isNumbers = (mode === 'num3' || mode === 'num4');
   const isBingo = (mode === 'bingo5');
   document.getElementById('numbersInputCard').style.display = isNumbers ? '' : 'none';
-  document.getElementById('countCard').style.display = (isNumbers || isBingo) ? 'none' : '';
+  document.getElementById('countCard').style.display = isNumbers ? 'none' : '';
   document.getElementById('statsCard').style.display = 'none';
   if (!isNumbers && !isBingo) renderStats();
 }
@@ -1543,7 +1543,6 @@ function showError(msg) {
 
 
 // ===== Bingo5 Generator =====
-// ビンゴ5：1〜40の数字が8グループ（各5個）に分かれ、各グループから1個選ぶ
 async function generateBingo5() {
   const groqKey = document.getElementById('groqKey').value.trim();
   if (!groqKey) { showError('Groq APIキーを入力してください'); return; }
@@ -1554,76 +1553,68 @@ async function generateBingo5() {
   document.getElementById('errorArea').style.display = 'none';
   document.getElementById('resultsArea').innerHTML = '';
 
-  // ビンゴ5の8グループ（各5個、1〜40）
-  // グループ: [1-5],[6-10],[11-15],[16-20],[21-25],[26-30],[31-35],[36-40]
   const BINGO_GROUPS = [
-    [1,2,3,4,5],
-    [6,7,8,9,10],
-    [11,12,13,14,15],
-    [16,17,18,19,20],
-    [21,22,23,24,25],
-    [26,27,28,29,30],
-    [31,32,33,34,35],
-    [36,37,38,39,40]
+    [1,2,3,4,5],[6,7,8,9,10],[11,12,13,14,15],[16,17,18,19,20],
+    [21,22,23,24,25],[26,27,28,29,30],[31,32,33,34,35],[36,37,38,39,40]
   ];
 
-  // 各グループから1つランダムに選ぶ
   function pickBingo() {
     return BINGO_GROUPS.map(g => g[Math.floor(Math.random() * g.length)]);
   }
 
-  const picks = pickBingo();
+  const count = currentCount || 1;
+  const allPicks = Array.from({length: count}, () => pickBingo());
+
   const resultsArea = document.getElementById('resultsArea');
   document.getElementById('loadingArea').style.display = 'none';
 
-  // ビンゴカード風表示（3×3、中央FREE）
-  const positions = [
-    picks[0], picks[1], picks[2],
-    picks[3], 'FREE',   picks[4],
-    picks[5], picks[6], picks[7]
-  ];
-
-  const cardHtml = `
-    <div class="result-set">
-      <div class="result-set-header">
-        <span class="set-label">BINGO 5</span>
-        <span class="set-type-badge badge-bingo5">ビンゴ5</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;max-width:220px;margin-left:auto;margin-right:auto;">
-        ${positions.map(v => v === 'FREE'
-          ? `<div style="background:radial-gradient(circle at 35% 35%,#ffe066,#cc9900);border-radius:50%;width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:0.65rem;font-weight:900;color:#fff;margin:auto;box-shadow:0 3px 10px rgba(200,150,0,0.4);">FREE</div>`
-          : `<div style="background:radial-gradient(circle at 35% 35%,#4da8ff,#0044aa);border-radius:50%;width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:1rem;font-weight:900;color:#fff;margin:auto;box-shadow:0 3px 10px rgba(0,87,168,0.3);">${v}</div>`
-        ).join('')}
-      </div>
-      <div id="bingo-comment">
-        <div class="loading-dots" style="padding:10px 0">
-          <div class="loading-dot"></div>
-          <div class="loading-dot"></div>
-          <div class="loading-dot"></div>
+  // 全カード描画
+  allPicks.forEach((picks, idx) => {
+    const positions = [
+      picks[0], picks[1], picks[2],
+      picks[3], 'FREE',   picks[4],
+      picks[5], picks[6], picks[7]
+    ];
+    const cardHtml = `
+      <div class="result-set">
+        <div class="result-set-header">
+          <span class="set-label">SET ${idx + 1}</span>
+          <span class="set-type-badge badge-bingo5">ビンゴ5</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;max-width:220px;margin-left:auto;margin-right:auto;">
+          ${positions.map(v => v === 'FREE'
+            ? `<div style="background:radial-gradient(circle at 35% 35%,#ffe066,#cc9900);border-radius:50%;width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:0.65rem;font-weight:900;color:#fff;margin:auto;box-shadow:0 3px 10px rgba(200,150,0,0.4);">FREE</div>`
+            : `<div style="background:radial-gradient(circle at 35% 35%,#4da8ff,#0044aa);border-radius:50%;width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:1rem;font-weight:900;color:#fff;margin:auto;box-shadow:0 3px 10px rgba(0,87,168,0.3);">${v}</div>`
+          ).join('')}
+        </div>
+        <div id="bingo-comment-${idx}">
+          <div class="loading-dots" style="padding:10px 0">
+            <div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div>
+          </div>
         </div>
       </div>
-    </div>
-  `;
-  resultsArea.innerHTML = cardHtml;
-
-  // AIコメント
-  try {
-    const prompt = `以下はビンゴ5の予測数字です（3×3のビンゴカード形式、中央はFREE）。
-選んだ数字: ${picks.join(', ')}
-各グループの選択: ${BINGO_GROUPS.map((g,i) => `G${i+1}[${g.join(',')}]→${picks[i]}`).join(' ')}
-
-この選択について、運気・バランス・直感を絡めた楽しいコメントを日本語で2〜3文だけ書いてください。思考過程・英語・下書きは不要です。日本語のコメント文のみ出力してください。`;
-
-    const raw = await callAPI(prompt);
-    const comment = extractJapanese(raw);
-    document.getElementById('bingo-comment').innerHTML = `
-      <div class="ai-comment">
-        <div class="ai-comment-header">AI予測コメント — llama-3.3-70b</div>
-        ${comment}
-      </div>
     `;
-  } catch(e) {
-    document.getElementById('bingo-comment').innerHTML = `<div class="ai-comment">コメント生成エラー</div>`;
+    resultsArea.innerHTML += cardHtml;
+  });
+
+  // AIコメントを順に生成
+  for (let idx = 0; idx < allPicks.length; idx++) {
+    const picks = allPicks[idx];
+    try {
+      const prompt = `以下はビンゴ5の予測数字です（3×3ビンゴカード、中央はFREE）。
+選んだ数字: ${picks.join(', ')}
+各グループ: ${BINGO_GROUPS.map((g,i) => `G${i+1}→${picks[i]}`).join(' ')}
+この選択について、運気・バランス・直感を絡めた楽しいコメントを日本語で2〜3文だけ書いてください。思考過程・英語・下書きは不要です。日本語のコメント文のみ出力してください。`;
+      const raw = await callAPI(prompt);
+      const comment = extractJapanese(raw);
+      document.getElementById(`bingo-comment-${idx}`).innerHTML = `
+        <div class="ai-comment">
+          <div class="ai-comment-header">AI予測コメント — llama-3.3-70b</div>
+          ${comment}
+        </div>`;
+    } catch(e) {
+      document.getElementById(`bingo-comment-${idx}`).innerHTML = `<div class="ai-comment">コメント生成エラー</div>`;
+    }
   }
 
   btn.disabled = false;
