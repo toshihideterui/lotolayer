@@ -274,6 +274,38 @@
     color: var(--blue);
   }
 
+
+  .strategy-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .strategy-chip {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 8px;
+    background: #f5f7fc;
+    text-align: center;
+  }
+
+  .strategy-chip strong {
+    display: block;
+    font-size: 0.82rem;
+    margin-bottom: 4px;
+  }
+
+  .strategy-chip span {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+
+  .strategy-chip.stable { background: var(--blue-light); border-color: #b8d0f0; color: var(--blue); }
+  .strategy-chip.wave { background: var(--green-light); border-color: #a8dfc0; color: var(--green); }
+  .strategy-chip.intuition { background: var(--purple-light); border-color: #d0b8f0; color: var(--purple); }
+
   /* API Key */
   .api-input {
     width: 100%;
@@ -777,7 +809,7 @@
       </svg>
     </div>
     <h1>LOTO LAYER</h1>
-    <p>統計 × AI 予測 ｜ ロト6 / ロト7 / ミニロト / ナンバーズ / ビンゴ5</p>
+    <p>統計 × AI 3層予測 ｜ ロト6 / ロト7 / ミニロト / ナンバーズ / ビンゴ5</p>
   </div>
 
   <!-- Mode Select -->
@@ -833,19 +865,15 @@
     <p class="api-note" style="margin-top:8px;">Groq（llama-3.3-70b）を使用します。<a href="https://console.groq.com" target="_blank" style="color:var(--blue);">console.groq.com</a> で無料取得できます。</p>
   </div>
 
-  <!-- Count -->
+  <!-- Strategy -->
   <div class="card" id="countCard">
-    <div class="card-title">生成セット数</div>
-    <div class="count-row">
-      <span class="count-label">何セット予測する？</span>
-      <div class="count-btns">
-        <button class="count-btn active" onclick="selectCount(1)" id="cnt-1">1</button>
-        <button class="count-btn" onclick="selectCount(2)" id="cnt-2">2</button>
-        <button class="count-btn" onclick="selectCount(3)" id="cnt-3">3</button>
-        <button class="count-btn" onclick="selectCount(4)" id="cnt-4">4</button>
-        <button class="count-btn" onclick="selectCount(5)" id="cnt-5">5</button>
-      </div>
+    <div class="card-title">3層予測モード</div>
+    <div class="strategy-grid">
+      <div class="strategy-chip stable"><strong>本命型</strong><span>頻度・バランス重視</span></div>
+      <div class="strategy-chip wave"><strong>波動型</strong><span>冷え数字・反発狙い</span></div>
+      <div class="strategy-chip intuition"><strong>AI直感型</strong><span>偏りと勢いを加味</span></div>
     </div>
+    <p class="api-note" style="margin-top:10px;">※ 予測は3セット固定です。分散しすぎず、それぞれ違う理論で組み立てます。</p>
   </div>
 
   <!-- Generate -->
@@ -884,7 +912,7 @@
 // ===== State =====
 let currentMode = 'loto6';
 let currentModel = 'groq';
-let currentCount = 1;
+let currentCount = 3;
 
 const MODES = {
   loto6: { max: 43, pick: 6, name: 'ロト6', badge: 'badge-loto6' },
@@ -979,9 +1007,11 @@ function selectModel(model) {
 }
 
 function selectCount(n) {
-  currentCount = n;
+  // ロト系は3層予測に固定。旧ボタン互換のため関数だけ残します。
+  currentCount = 3;
   [1,2,3,4,5].forEach(c => {
-    document.getElementById('cnt-'+c).classList.toggle('active', c === n);
+    const btn = document.getElementById('cnt-'+c);
+    if (btn) btn.classList.toggle('active', c === 3);
   });
 }
 
@@ -1030,71 +1060,144 @@ function renderStats() {
   }
 }
 
-// ===== Weighted random pick (緩やかなバランス調整) =====
-function weightedPick(mode) {
+// ===== 3-layer prediction logic =====
+function getNumberProfile(mode) {
   const m = MODES[mode];
   const freq = getFreq(mode);
+  const nums = Array.from({length: m.max}, (_, i) => i + 1);
+  const counts = nums.map(n => freq[n]);
+  const maxF = Math.max(...counts);
+  const minF = Math.min(...counts);
+  const avgF = counts.reduce((a,b) => a+b, 0) / counts.length;
 
-  // 出現頻度に少しランダム性を加えた重みを作成（固定パターンを避ける）
-  function buildWeights(available) {
-    return available.map(n => {
-      const f = freq[n];
-      // 頻度に±15%のランダムゆらぎを加える
-      const jitter = 0.85 + Math.random() * 0.3;
-      return f * jitter;
-    });
-  }
-
-  // 最大10回試行して「全数字が同じ十の位に偏っていない」組み合わせを選ぶ
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const picked = [];
-    const available = Array.from({length: m.max}, (_,i) => i+1);
-
-    while (picked.length < m.pick) {
-      const weights = buildWeights(available);
-      const wTotal = weights.reduce((a,b) => a+b, 0);
-      let r = Math.random() * wTotal;
-      let idx = 0;
-      for (let i = 0; i < weights.length; i++) {
-        r -= weights[i];
-        if (r <= 0) { idx = i; break; }
-      }
-      picked.push(available[idx]);
-      available.splice(idx, 1);
-    }
-
-    // 緩やかなチェック：同じ十の位が3つ以上固まっていないか
-    const decades = picked.map(n => Math.floor((n-1) / 10));
-    const decadeCount = {};
-    decades.forEach(d => decadeCount[d] = (decadeCount[d] || 0) + 1);
-    const maxDecade = Math.max(...Object.values(decadeCount));
-
-    if (maxDecade <= 3) {
-      return { main: picked.sort((a,b)=>a-b) };
-    }
-  }
-
-  // フォールバック：制限なしで返す
-  const picked = [];
-  const available = Array.from({length: m.max}, (_,i) => i+1);
-  while (picked.length < m.pick) {
-    const weights = buildWeights(available);
-    const wTotal = weights.reduce((a,b) => a+b, 0);
-    let r = Math.random() * wTotal;
-    let idx = 0;
-    for (let i = 0; i < weights.length; i++) {
-      r -= weights[i];
-      if (r <= 0) { idx = i; break; }
-    }
-    picked.push(available[idx]);
-    available.splice(idx, 1);
-  }
-  return { main: picked.sort((a,b)=>a-b) };
+  return { m, freq, nums, maxF, minF, avgF, range: maxF - minF || 1 };
 }
 
-function buildWeights(available) {
-  // フォールバック用（スコープ外でも使えるよう定義）
-  return available.map(() => 1);
+function pseudoRecentGap(n, mode) {
+  // 過去データの「最終出現回」は未保持のため、番号・頻度・抽選種別から安定した擬似ギャップを作る。
+  // 本物の直近データを追加すると、ここを置き換えるだけで精度アップできます。
+  const freq = getFreq(mode);
+  const seed = (n * 37 + freq[n] * 11 + MODES[mode].max * 5) % 29;
+  return seed + Math.max(0, Math.round((getNumberProfile(mode).avgF - freq[n]) / 6));
+}
+
+function weightedChoice(items, weightFn) {
+  const weights = items.map(item => Math.max(0.01, weightFn(item)));
+  const total = weights.reduce((a,b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < items.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return items[i];
+  }
+  return items[items.length - 1];
+}
+
+function evaluateSet(numbers, mode, strategy) {
+  const { m, freq, avgF } = getNumberProfile(mode);
+  const sorted = [...numbers].sort((a,b)=>a-b);
+  const odd = sorted.filter(n => n % 2 === 1).length;
+  const low = sorted.filter(n => n <= Math.ceil(m.max / 2)).length;
+  const sum = sorted.reduce((a,b)=>a+b, 0);
+  const avgSum = (m.max + 1) / 2 * m.pick;
+  const decades = {};
+  sorted.forEach(n => {
+    const d = Math.floor((n - 1) / 10);
+    decades[d] = (decades[d] || 0) + 1;
+  });
+  const maxDecade = Math.max(...Object.values(decades));
+  const consecutive = sorted.filter((n, i) => i > 0 && n === sorted[i - 1] + 1).length;
+  const hot = sorted.filter(n => freq[n] >= avgF).length;
+  const cold = sorted.filter(n => freq[n] < avgF).length;
+  const gaps = sorted.map(n => pseudoRecentGap(n, mode));
+  const avgGap = gaps.reduce((a,b)=>a+b, 0) / gaps.length;
+
+  let score = 100;
+  score -= Math.abs(odd - m.pick / 2) * 8;
+  score -= Math.abs(low - m.pick / 2) * 7;
+  score -= Math.abs(sum - avgSum) / Math.max(1, m.max) * 6;
+  if (maxDecade > 3) score -= (maxDecade - 3) * 14;
+
+  if (strategy === 'stable') {
+    score += hot * 7;
+    score -= consecutive * 5;
+  } else if (strategy === 'wave') {
+    score += cold * 6 + avgGap * 1.3;
+    if (consecutive === 1) score += 10;
+    if (consecutive > 2) score -= 10;
+  } else {
+    score += Math.min(maxDecade, 3) * 5;
+    if (sum > avgSum) score += 5;
+    if (consecutive >= 1) score += 4;
+  }
+
+  return score + Math.random() * 8;
+}
+
+function pickByStrategy(mode, strategy) {
+  const { m, freq, nums, maxF, minF, avgF, range } = getNumberProfile(mode);
+  let best = null;
+
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const available = [...nums];
+    const picked = [];
+
+    while (picked.length < m.pick) {
+      const n = weightedChoice(available, x => {
+        const hotScore = (freq[x] - minF) / range;
+        const coldScore = (maxF - freq[x]) / range;
+        const gapScore = Math.min(1, pseudoRecentGap(x, mode) / 30);
+        const middleScore = 1 - Math.abs(x - (m.max + 1) / 2) / ((m.max + 1) / 2);
+        const jitter = 0.85 + Math.random() * 0.3;
+
+        if (strategy === 'stable') {
+          return (1.0 + hotScore * 2.2 + middleScore * 0.7) * jitter;
+        }
+        if (strategy === 'wave') {
+          return (1.0 + coldScore * 1.5 + gapScore * 2.0 + (x % 10 === 0 ? 0.2 : 0)) * jitter;
+        }
+        // AI直感型：高数字・同十台・頻度の勢いを少し混ぜる
+        const highScore = x / m.max;
+        const decadeBias = picked.length && Math.floor((picked[0] - 1) / 10) === Math.floor((x - 1) / 10) ? 0.8 : 0;
+        return (1.0 + hotScore * 0.8 + highScore * 0.8 + decadeBias + gapScore * 0.5) * jitter;
+      });
+      picked.push(n);
+      available.splice(available.indexOf(n), 1);
+    }
+
+    const score = evaluateSet(picked, mode, strategy);
+    if (!best || score > best.score) best = { main: picked.sort((a,b)=>a-b), score };
+  }
+
+  return best;
+}
+
+function buildThreeLayerSets(mode) {
+  return [
+    { ...pickByStrategy(mode, 'stable'), strategy: 'stable', label: '本命型', tagline: '頻度・奇偶・低高バランス重視' },
+    { ...pickByStrategy(mode, 'wave'), strategy: 'wave', label: '波動型', tagline: '冷え数字と反発候補を重視' },
+    { ...pickByStrategy(mode, 'intuition'), strategy: 'intuition', label: 'AI直感型', tagline: '偏り・勢い・高数字を少し加味' }
+  ];
+}
+
+function buildReasonText(set, mode) {
+  const freq = getFreq(mode);
+  const profile = getNumberProfile(mode);
+  const odd = set.main.filter(n => n % 2 === 1).length;
+  const even = set.main.length - odd;
+  const low = set.main.filter(n => n <= Math.ceil(profile.m.max / 2)).length;
+  const high = set.main.length - low;
+  const hotNums = set.main.filter(n => freq[n] >= profile.avgF).map(n => `${n}番`);
+  const coldNums = set.main.filter(n => freq[n] < profile.avgF).map(n => `${n}番`);
+  const gapTop = [...set.main].sort((a,b) => pseudoRecentGap(b, mode) - pseudoRecentGap(a, mode)).slice(0, 2).map(n => `${n}番`);
+  const sum = set.main.reduce((a,b)=>a+b, 0);
+
+  if (set.strategy === 'stable') {
+    return `奇数${odd}・偶数${even}、低数字${low}・高数字${high}でバランスを整えました。${hotNums.slice(0,3).join('、') || '平均以上の数字'}を軸に、合計値${sum}が極端に寄りすぎない本命寄りの構成です。`;
+  }
+  if (set.strategy === 'wave') {
+    return `${coldNums.slice(0,3).join('、') || '低頻度寄りの数字'}を反発候補として混ぜました。擬似未出現ギャップでは${gapTop.join('、')}が目立つため、波が戻るシナリオを狙います。`;
+  }
+  return `AI直感型では、統計だけで丸めず、数字帯の偏りと勢いを少し残しました。合計値${sum}、奇数${odd}・偶数${even}の形から、整いすぎない“来そう感”を優先しています。`;
 }
 
 // ===== API call =====
@@ -1469,10 +1572,8 @@ async function generate() {
   document.getElementById('resultsArea').innerHTML = '';
 
   const mode = MODES[currentMode];
-  const sets = [];
-  for (let i = 0; i < currentCount; i++) {
-    sets.push(weightedPick(currentMode));
-  }
+  currentCount = 3;
+  const sets = buildThreeLayerSets(currentMode);
 
   // Render balls immediately
   const resultsArea = document.getElementById('resultsArea');
@@ -1482,9 +1583,10 @@ async function generate() {
     div.id = `set-${i}`;
     div.innerHTML = `
       <div class="result-set-header">
-        <span class="set-label">SET ${i+1}</span>
+        <span class="set-label">SET ${i+1}｜${s.label}</span>
         <span class="set-type-badge ${mode.badge}">${mode.name}</span>
       </div>
+      <div style="font-size:0.74rem;color:var(--muted);margin:-6px 0 10px;text-align:right;">${s.tagline}</div>
       <div class="balls-row" id="balls-${i}">
         ${s.main.map((n, bi) => `
           <div class="ball-wrapper" style="animation-delay:${bi*0.08}s">
@@ -1510,25 +1612,29 @@ async function generate() {
   for (let i = 0; i < sets.length; i++) {
     const s = sets[i];
     const freq = getFreq(currentMode);
-    const freqInfo = s.main.map(n => `${n}番(出現${freq[n]}回)`).join('、');
-    const prompt = `以下のロト予測数字について、運気・統計・直感を絡めた楽しいコメントを日本語で2〜3文だけ書いてください。思考過程や下書きは不要です。日本語のコメント文のみ出力してください。
-数字: ${s.main.join(', ')}（${mode.name}）
-頻度データ: ${freqInfo}`;
+    const freqInfo = s.main.map(n => `${n}番(出現${freq[n]}回/擬似未出現${pseudoRecentGap(n, currentMode)}回)`).join('、');
+    const localReason = buildReasonText(s, currentMode);
+    const prompt = `以下のロト予測数字について、${s.label}としての予想理由を日本語で2〜3文だけ書いてください。断定せず、当選保証もしないでください。思考過程や下書きは不要です。日本語のコメント文のみ出力してください。
+種類: ${mode.name}
+戦略: ${s.label}（${s.tagline}）
+数字: ${s.main.join(', ')}
+頻度データ: ${freqInfo}
+補足理由: ${localReason}`;
 
     try {
       const rawComment = await callAPI(prompt);
       const comment = extractJapanese(rawComment);
       document.getElementById(`comment-${i}`).innerHTML = `
         <div class="ai-comment">
-          <div class="ai-comment-header">AI予測コメント — llama-3.3-70b</div>
-          ${comment}
+          <div class="ai-comment-header">${s.label} 予想理由 — llama-3.3-70b</div>
+          ${comment}<br><span style="color:var(--muted);font-size:0.78rem;">補助ロジック：${localReason}</span>
         </div>
       `;
     } catch(e) {
       document.getElementById(`comment-${i}`).innerHTML = `
         <div class="ai-comment">
-          <div class="ai-comment-header">AI予測コメント</div>
-          ⚠️ コメント生成エラー: ${e.message}
+          <div class="ai-comment-header">${s.label} 予想理由</div>
+          ${localReason}<br><span style="color:var(--red);font-size:0.78rem;">⚠️ AIコメント生成エラー: ${e.message}</span>
         </div>
       `;
     }
@@ -1566,7 +1672,8 @@ async function generateBingo5() {
     return BINGO_GROUPS.map(g => g[Math.floor(Math.random() * g.length)]);
   }
 
-  const count = currentCount || 1;
+  const count = 3;
+  currentCount = 3;
   const allPicks = Array.from({length: count}, () => pickBingo());
 
   const resultsArea = document.getElementById('resultsArea');
@@ -1613,8 +1720,8 @@ async function generateBingo5() {
       const comment = extractJapanese(raw);
       document.getElementById(`bingo-comment-${idx}`).innerHTML = `
         <div class="ai-comment">
-          <div class="ai-comment-header">AI予測コメント — llama-3.3-70b</div>
-          ${comment}
+          <div class="ai-comment-header">${s.label} 予想理由 — llama-3.3-70b</div>
+          ${comment}<br><span style="color:var(--muted);font-size:0.78rem;">補助ロジック：${localReason}</span>
         </div>`;
     } catch(e) {
       document.getElementById(`bingo-comment-${idx}`).innerHTML = `<div class="ai-comment">コメント生成エラー</div>`;
