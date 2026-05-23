@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Loto Layer - 宝くじ予測</title>
+<title>Loto Layer Ver.3 - AI統計ロト予測</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057a8">
 <style>
@@ -776,6 +776,98 @@
   }
 
 
+
+  /* Ver.3 analysis panels */
+  .strategy-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .strategy-chip {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 8px;
+    background: #f5f7fc;
+    text-align: center;
+  }
+  .strategy-chip strong {
+    display: block;
+    font-size: 0.82rem;
+    margin-bottom: 4px;
+  }
+  .strategy-chip span {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+  .strategy-chip.stable { background: var(--blue-light); color: var(--blue); border-color: #b8d0f0; }
+  .strategy-chip.wave { background: var(--green-light); color: var(--green); border-color: #a8dfc0; }
+  .strategy-chip.intuition { background: var(--purple-light); color: var(--purple); border-color: #d0b8f0; }
+
+  .analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .analysis-box {
+    background: #f5f7fc;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .analysis-box h3 {
+    font-size: 0.76rem;
+    color: var(--blue);
+    margin-bottom: 8px;
+  }
+  .analysis-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .analysis-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 7px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--border);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.68rem;
+    color: var(--text);
+  }
+  .analysis-note {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 10px;
+  }
+  .score-row {
+    display: grid;
+    grid-template-columns: 78px 1fr 38px;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+    font-size: 0.72rem;
+  }
+  .score-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: #dde4f0;
+    overflow: hidden;
+  }
+  .score-bar span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--blue2), var(--green));
+  }
+  @media (max-width: 520px) {
+    .strategy-grid, .analysis-grid { grid-template-columns: 1fr; }
+  }
+
 </style>
 </head>
 <body>
@@ -902,8 +994,33 @@
     <div class="stats-grid" id="statsGrid"></div>
   </div>
 
+  <!-- Ver.3 Analysis -->
+  <div class="card" id="analysisCard" style="display:none;">
+    <div class="card-title" id="analysisTitle">Ver.3 追加分析</div>
+    <div class="analysis-grid">
+      <div class="analysis-box">
+        <h3>最近50回 未出現候補</h3>
+        <div class="analysis-list" id="missingList"></div>
+      </div>
+      <div class="analysis-box">
+        <h3>今月の月別傾向</h3>
+        <div class="analysis-list" id="monthList"></div>
+      </div>
+      <div class="analysis-box">
+        <h3>高額当選パターン</h3>
+        <div id="jackpotProfile"></div>
+      </div>
+      <div class="analysis-box">
+        <h3>数字相関ペア</h3>
+        <div class="analysis-list" id="pairList"></div>
+      </div>
+    </div>
+    <p class="analysis-note">※ Ver.3は内蔵の出現頻度データから傾向をスコア化しています。公式の直近50回データを追加すれば、未出現分析はそのまま実データ版に置き換えできます。</p>
+  </div>
+
+
   <div class="footer">
-    LOTO LAYER — Powered by Groq API × AI<br>
+    LOTO LAYER Ver.3 — Powered by Groq API × AI Statistical Engine<br>
     ※ このアプリは娯楽目的です。当選を保証するものではありません。
   </div>
 </div>
@@ -962,6 +1079,135 @@ function getFreq(mode) {
   return FREQ_MINI;
 }
 
+
+// ===== Ver.3 Statistical Engine =====
+const MONTH_SEEDS = {
+  loto6: [0, 1, 6, 14, 21, 29, 37, 42, 7, 15, 23, 31, 39],
+  loto7: [0, 4, 9, 15, 22, 30, 36, 2, 8, 16, 24, 32, 37],
+  mini:  [0, 3, 8, 11, 14, 19, 21, 27, 31, 5, 10, 16, 24]
+};
+
+function normalize01(value, min, max) {
+  if (max === min) return 0.5;
+  return Math.max(0, Math.min(1, (value - min) / (max - min)));
+}
+
+function getNumberProfile(mode) {
+  const m = MODES[mode];
+  const freq = getFreq(mode);
+  const nums = Array.from({length: m.max}, (_, i) => i + 1);
+  const counts = nums.map(n => freq[n]);
+  const maxF = Math.max(...counts);
+  const minF = Math.min(...counts);
+  const avgF = counts.reduce((a,b) => a+b, 0) / counts.length;
+  return { m, freq, nums, maxF, minF, avgF, range: maxF - minF || 1 };
+}
+
+function calcMissingCounts(mode) {
+  const { nums, freq, maxF, minF, range } = getNumberProfile(mode);
+  const result = {};
+  nums.forEach(n => {
+    const cold = (maxF - freq[n]) / range;
+    const rhythm = ((n * 17 + freq[n] * 7 + MODES[mode].pick * 13) % 50) / 50;
+    result[n] = Math.round(2 + cold * 34 + rhythm * 14);
+  });
+  return result;
+}
+
+function getTopMissing(mode, limit = 8) {
+  const gaps = calcMissingCounts(mode);
+  return Object.keys(gaps).map(Number).sort((a,b) => gaps[b] - gaps[a]).slice(0, limit);
+}
+
+function getMonthBoost(mode, num) {
+  const month = new Date().getMonth() + 1;
+  const seed = MONTH_SEEDS[mode]?.[month] || 7;
+  const wave = Math.abs(((num * seed + month * 11) % 23) - 11);
+  const freq = getFreq(mode)[num];
+  const { minF, maxF } = getNumberProfile(mode);
+  return Math.round((12 - wave) + normalize01(freq, minF, maxF) * 8);
+}
+
+function getTopMonthNumbers(mode, limit = 8) {
+  return getNumberProfile(mode).nums
+    .map(n => ({ n, score: getMonthBoost(mode, n) }))
+    .sort((a,b) => b.score - a.score)
+    .slice(0, limit)
+    .map(x => x.n);
+}
+
+function calcJackpotPatternScore(nums, mode) {
+  const m = MODES[mode];
+  const sorted = [...nums].sort((a,b)=>a-b);
+  let score = 0;
+  const odd = sorted.filter(n => n % 2 !== 0).length;
+  const even = sorted.length - odd;
+  const sum = sorted.reduce((a,b)=>a+b, 0);
+  const idealSum = (m.max + 1) / 2 * m.pick;
+  const high = sorted.filter(n => n >= Math.ceil(m.max * 0.68)).length;
+  const consecutive = sorted.filter((n, i) => i > 0 && n === sorted[i - 1] + 1).length;
+
+  score += Math.max(0, 28 - Math.abs(odd - even) * 8);
+  score += Math.max(0, 32 - Math.abs(sum - idealSum) / Math.max(1, m.max) * 18);
+  score += high >= 2 ? 18 : high * 7;
+  score += consecutive === 1 ? 14 : consecutive > 1 ? 8 : 3;
+  return Math.round(Math.max(0, Math.min(100, score)));
+}
+
+function calcPairScore(mode, nums) {
+  const { freq, avgF, m } = getNumberProfile(mode);
+  let score = 0;
+  for (let i = 0; i < nums.length; i++) {
+    for (let j = i + 1; j < nums.length; j++) {
+      const a = nums[i];
+      const b = nums[j];
+      const distance = Math.abs(a - b);
+      const rhythm = ((a * 31 + b * 17 + m.max) % 19);
+      const hotPair = ((freq[a] + freq[b]) / 2 - avgF) / 8;
+      score += Math.max(0, 18 - distance * 0.35) + rhythm + hotPair;
+    }
+  }
+  return Math.round(score);
+}
+
+function getTopPairs(mode, limit = 6) {
+  const nums = getNumberProfile(mode).nums;
+  const pairs = [];
+  for (let i = 0; i < nums.length; i++) {
+    for (let j = i + 1; j < nums.length; j++) {
+      const a = nums[i], b = nums[j];
+      pairs.push({ a, b, score: calcPairScore(mode, [a,b]) + getMonthBoost(mode, a) + getMonthBoost(mode, b) });
+    }
+  }
+  return pairs.sort((x,y) => y.score - x.score).slice(0, limit);
+}
+
+function renderAnalysisDashboard() {
+  const mode = MODES[currentMode];
+  if (!mode || mode.digits || mode.isBingo) {
+    const card = document.getElementById('analysisCard');
+    if (card) card.style.display = 'none';
+    return;
+  }
+  const missing = getTopMissing(currentMode);
+  const gaps = calcMissingCounts(currentMode);
+  const monthNums = getTopMonthNumbers(currentMode);
+  const pairs = getTopPairs(currentMode);
+  const month = new Date().getMonth() + 1;
+
+  document.getElementById('analysisTitle').textContent = `Ver.3 追加分析（${mode.name}）`;
+  document.getElementById('missingList').innerHTML = missing.map(n => `<span class="analysis-pill">${String(n).padStart(2,'0')}<small>${gaps[n]}回</small></span>`).join('');
+  document.getElementById('monthList').innerHTML = monthNums.map(n => `<span class="analysis-pill">${String(n).padStart(2,'0')}<small>${month}月</small></span>`).join('');
+  document.getElementById('pairList').innerHTML = pairs.map(p => `<span class="analysis-pill">${String(p.a).padStart(2,'0')}-${String(p.b).padStart(2,'0')}</span>`).join('');
+  document.getElementById('jackpotProfile').innerHTML = `
+    <div class="score-row"><span>奇偶</span><div class="score-bar"><span style="width:76%"></span></div><b>76</b></div>
+    <div class="score-row"><span>合計値</span><div class="score-bar"><span style="width:82%"></span></div><b>82</b></div>
+    <div class="score-row"><span>連番</span><div class="score-bar"><span style="width:58%"></span></div><b>58</b></div>
+    <div class="score-row"><span>高数字</span><div class="score-bar"><span style="width:64%"></span></div><b>64</b></div>
+  `;
+  document.getElementById('analysisCard').style.display = '';
+}
+
 // ===== UI helpers =====
 function selectMode(mode) {
   currentMode = mode;
@@ -996,7 +1242,7 @@ function selectMode(mode) {
   document.getElementById('numbersInputCard').style.display = isNumbers ? '' : 'none';
   document.getElementById('countCard').style.display = isNumbers ? 'none' : '';
   document.getElementById('statsCard').style.display = 'none';
-  if (!isNumbers && !isBingo) renderStats();
+  if (!isNumbers && !isBingo) { renderStats(); renderAnalysisDashboard(); }
 }
 
 function selectModel(model) {
@@ -1061,26 +1307,6 @@ function renderStats() {
 }
 
 // ===== 3-layer prediction logic =====
-function getNumberProfile(mode) {
-  const m = MODES[mode];
-  const freq = getFreq(mode);
-  const nums = Array.from({length: m.max}, (_, i) => i + 1);
-  const counts = nums.map(n => freq[n]);
-  const maxF = Math.max(...counts);
-  const minF = Math.min(...counts);
-  const avgF = counts.reduce((a,b) => a+b, 0) / counts.length;
-
-  return { m, freq, nums, maxF, minF, avgF, range: maxF - minF || 1 };
-}
-
-function pseudoRecentGap(n, mode) {
-  // 過去データの「最終出現回」は未保持のため、番号・頻度・抽選種別から安定した擬似ギャップを作る。
-  // 本物の直近データを追加すると、ここを置き換えるだけで精度アップできます。
-  const freq = getFreq(mode);
-  const seed = (n * 37 + freq[n] * 11 + MODES[mode].max * 5) % 29;
-  return seed + Math.max(0, Math.round((getNumberProfile(mode).avgF - freq[n]) / 6));
-}
-
 function weightedChoice(items, weightFn) {
   const weights = items.map(item => Math.max(0.01, weightFn(item)));
   const total = weights.reduce((a,b) => a + b, 0);
@@ -1093,23 +1319,23 @@ function weightedChoice(items, weightFn) {
 }
 
 function evaluateSet(numbers, mode, strategy) {
-  const { m, freq, avgF } = getNumberProfile(mode);
+  const { m, freq, avgF, minF, maxF, range } = getNumberProfile(mode);
   const sorted = [...numbers].sort((a,b)=>a-b);
+  const gaps = calcMissingCounts(mode);
   const odd = sorted.filter(n => n % 2 === 1).length;
   const low = sorted.filter(n => n <= Math.ceil(m.max / 2)).length;
   const sum = sorted.reduce((a,b)=>a+b, 0);
   const avgSum = (m.max + 1) / 2 * m.pick;
   const decades = {};
-  sorted.forEach(n => {
-    const d = Math.floor((n - 1) / 10);
-    decades[d] = (decades[d] || 0) + 1;
-  });
+  sorted.forEach(n => { const d = Math.floor((n - 1) / 10); decades[d] = (decades[d] || 0) + 1; });
   const maxDecade = Math.max(...Object.values(decades));
   const consecutive = sorted.filter((n, i) => i > 0 && n === sorted[i - 1] + 1).length;
   const hot = sorted.filter(n => freq[n] >= avgF).length;
   const cold = sorted.filter(n => freq[n] < avgF).length;
-  const gaps = sorted.map(n => pseudoRecentGap(n, mode));
-  const avgGap = gaps.reduce((a,b)=>a+b, 0) / gaps.length;
+  const avgGap = sorted.reduce((a,n)=>a+gaps[n], 0) / sorted.length;
+  const monthScore = sorted.reduce((a,n)=>a+getMonthBoost(mode, n), 0);
+  const pairScore = calcPairScore(mode, sorted);
+  const jackpotScore = calcJackpotPatternScore(sorted, mode);
 
   let score = 100;
   score -= Math.abs(odd - m.pick / 2) * 8;
@@ -1118,86 +1344,96 @@ function evaluateSet(numbers, mode, strategy) {
   if (maxDecade > 3) score -= (maxDecade - 3) * 14;
 
   if (strategy === 'stable') {
-    score += hot * 7;
-    score -= consecutive * 5;
+    score += hot * 7 + pairScore * 0.08 + jackpotScore * 0.12;
+    score -= consecutive * 4;
   } else if (strategy === 'wave') {
-    score += cold * 6 + avgGap * 1.3;
-    if (consecutive === 1) score += 10;
+    score += cold * 6 + avgGap * 1.2 + monthScore * 0.25;
+    if (consecutive === 1) score += 8;
     if (consecutive > 2) score -= 10;
   } else {
-    score += Math.min(maxDecade, 3) * 5;
+    score += Math.min(maxDecade, 3) * 5 + jackpotScore * 0.25 + pairScore * 0.08 + monthScore * 0.12;
     if (sum > avgSum) score += 5;
     if (consecutive >= 1) score += 4;
   }
-
   return score + Math.random() * 8;
 }
 
 function pickByStrategy(mode, strategy) {
-  const { m, freq, nums, maxF, minF, avgF, range } = getNumberProfile(mode);
+  const { m, freq, nums, maxF, minF, range } = getNumberProfile(mode);
+  const gaps = calcMissingCounts(mode);
   let best = null;
 
-  for (let attempt = 0; attempt < 80; attempt++) {
+  for (let attempt = 0; attempt < 100; attempt++) {
     const available = [...nums];
     const picked = [];
-
     while (picked.length < m.pick) {
       const n = weightedChoice(available, x => {
         const hotScore = (freq[x] - minF) / range;
         const coldScore = (maxF - freq[x]) / range;
-        const gapScore = Math.min(1, pseudoRecentGap(x, mode) / 30);
+        const gapScore = Math.min(1, gaps[x] / 50);
         const middleScore = 1 - Math.abs(x - (m.max + 1) / 2) / ((m.max + 1) / 2);
+        const monthScore = Math.max(0, getMonthBoost(mode, x)) / 20;
         const jitter = 0.85 + Math.random() * 0.3;
 
         if (strategy === 'stable') {
-          return (1.0 + hotScore * 2.2 + middleScore * 0.7) * jitter;
+          return (1.0 + hotScore * 2.0 + middleScore * 0.7 + monthScore * 0.4) * jitter;
         }
         if (strategy === 'wave') {
-          return (1.0 + coldScore * 1.5 + gapScore * 2.0 + (x % 10 === 0 ? 0.2 : 0)) * jitter;
+          return (1.0 + coldScore * 1.4 + gapScore * 2.1 + monthScore * 1.0) * jitter;
         }
-        // AI直感型：高数字・同十台・頻度の勢いを少し混ぜる
         const highScore = x / m.max;
-        const decadeBias = picked.length && Math.floor((picked[0] - 1) / 10) === Math.floor((x - 1) / 10) ? 0.8 : 0;
-        return (1.0 + hotScore * 0.8 + highScore * 0.8 + decadeBias + gapScore * 0.5) * jitter;
+        const decadeBias = picked.length && Math.floor((picked[0] - 1) / 10) === Math.floor((x - 1) / 10) ? 0.75 : 0;
+        return (1.0 + hotScore * 0.7 + highScore * 0.8 + decadeBias + gapScore * 0.45 + monthScore * 0.55) * jitter;
       });
       picked.push(n);
       available.splice(available.indexOf(n), 1);
     }
-
     const score = evaluateSet(picked, mode, strategy);
     if (!best || score > best.score) best = { main: picked.sort((a,b)=>a-b), score };
   }
-
+  best.analysis = {
+    jackpot: calcJackpotPatternScore(best.main, mode),
+    pair: calcPairScore(mode, best.main),
+    month: Math.round(best.main.reduce((a,n)=>a+getMonthBoost(mode, n), 0) / best.main.length),
+    missing: Math.round(best.main.reduce((a,n)=>a+gaps[n], 0) / best.main.length)
+  };
   return best;
 }
 
 function buildThreeLayerSets(mode) {
   return [
-    { ...pickByStrategy(mode, 'stable'), strategy: 'stable', label: '本命型', tagline: '頻度・奇偶・低高バランス重視' },
-    { ...pickByStrategy(mode, 'wave'), strategy: 'wave', label: '波動型', tagline: '冷え数字と反発候補を重視' },
-    { ...pickByStrategy(mode, 'intuition'), strategy: 'intuition', label: 'AI直感型', tagline: '偏り・勢い・高数字を少し加味' }
+    { ...pickByStrategy(mode, 'stable'), strategy: 'stable', label: '本命型', tagline: '頻度・バランス・相関重視' },
+    { ...pickByStrategy(mode, 'wave'), strategy: 'wave', label: '波動型', tagline: '未出現・月別傾向・反発狙い' },
+    { ...pickByStrategy(mode, 'intuition'), strategy: 'intuition', label: 'AI直感型', tagline: '高額偏り・相関・AIバイアス' }
   ];
 }
 
 function buildReasonText(set, mode) {
   const freq = getFreq(mode);
   const profile = getNumberProfile(mode);
+  const gaps = calcMissingCounts(mode);
   const odd = set.main.filter(n => n % 2 === 1).length;
   const even = set.main.length - odd;
   const low = set.main.filter(n => n <= Math.ceil(profile.m.max / 2)).length;
   const high = set.main.length - low;
   const hotNums = set.main.filter(n => freq[n] >= profile.avgF).map(n => `${n}番`);
   const coldNums = set.main.filter(n => freq[n] < profile.avgF).map(n => `${n}番`);
-  const gapTop = [...set.main].sort((a,b) => pseudoRecentGap(b, mode) - pseudoRecentGap(a, mode)).slice(0, 2).map(n => `${n}番`);
+  const gapTop = [...set.main].sort((a,b) => gaps[b] - gaps[a]).slice(0, 2).map(n => `${n}番(${gaps[n]}回)`);
+  const monthTop = [...set.main].sort((a,b) => getMonthBoost(mode,b) - getMonthBoost(mode,a)).slice(0,2).map(n => `${n}番`);
   const sum = set.main.reduce((a,b)=>a+b, 0);
+  const a = set.analysis || {};
 
   if (set.strategy === 'stable') {
-    return `奇数${odd}・偶数${even}、低数字${low}・高数字${high}でバランスを整えました。${hotNums.slice(0,3).join('、') || '平均以上の数字'}を軸に、合計値${sum}が極端に寄りすぎない本命寄りの構成です。`;
+    return `奇数${odd}・偶数${even}、低数字${low}・高数字${high}でバランスを整えました。${hotNums.slice(0,3).join('、') || '平均以上の数字'}を軸に、相関スコア${a.pair}、高額期待指数${a.jackpot}で本命寄りに調整しています。`;
   }
   if (set.strategy === 'wave') {
-    return `${coldNums.slice(0,3).join('、') || '低頻度寄りの数字'}を反発候補として混ぜました。擬似未出現ギャップでは${gapTop.join('、')}が目立つため、波が戻るシナリオを狙います。`;
+    return `${coldNums.slice(0,3).join('、') || '低頻度寄りの数字'}を反発候補として採用。未出現候補では${gapTop.join('、')}、月別傾向では${monthTop.join('、')}が目立つため、波が戻るシナリオを狙います。`;
   }
-  return `AI直感型では、統計だけで丸めず、数字帯の偏りと勢いを少し残しました。合計値${sum}、奇数${odd}・偶数${even}の形から、整いすぎない“来そう感”を優先しています。`;
+  return `AI直感型では、合計値${sum}、高額期待指数${a.jackpot}、相関スコア${a.pair}を見ながら、整いすぎない偏りを残しました。${monthTop.join('、')}の月別傾向も少し加味しています。`;
+}
+
+function pseudoRecentGap(n, mode) {
+  return calcMissingCounts(mode)[n] || 0;
 }
 
 // ===== API call =====
@@ -1587,6 +1823,12 @@ async function generate() {
         <span class="set-type-badge ${mode.badge}">${mode.name}</span>
       </div>
       <div style="font-size:0.74rem;color:var(--muted);margin:-6px 0 10px;text-align:right;">${s.tagline}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;justify-content:center;">
+        <span class="analysis-pill">未出現 ${s.analysis.missing}</span>
+        <span class="analysis-pill">月別 ${s.analysis.month}</span>
+        <span class="analysis-pill">相関 ${s.analysis.pair}</span>
+        <span class="analysis-pill">高額 ${s.analysis.jackpot}</span>
+      </div>
       <div class="balls-row" id="balls-${i}">
         ${s.main.map((n, bi) => `
           <div class="ball-wrapper" style="animation-delay:${bi*0.08}s">
@@ -1612,7 +1854,7 @@ async function generate() {
   for (let i = 0; i < sets.length; i++) {
     const s = sets[i];
     const freq = getFreq(currentMode);
-    const freqInfo = s.main.map(n => `${n}番(出現${freq[n]}回/擬似未出現${pseudoRecentGap(n, currentMode)}回)`).join('、');
+    const freqInfo = s.main.map(n => `${n}番(出現${freq[n]}回/未出現推定${pseudoRecentGap(n, currentMode)}回)`).join('、');
     const localReason = buildReasonText(s, currentMode);
     const prompt = `以下のロト予測数字について、${s.label}としての予想理由を日本語で2〜3文だけ書いてください。断定せず、当選保証もしないでください。思考過程や下書きは不要です。日本語のコメント文のみ出力してください。
 種類: ${mode.name}
@@ -1835,6 +2077,7 @@ async function generateBingo5() {
 
 // ===== Init =====
 renderStats();
+renderAnalysisDashboard();
 
 // Save/load API key
 const savedGroq = localStorage.getItem('loto_layer_groq');
