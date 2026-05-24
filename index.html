@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Loto Layer Ver.3 - AI統計ロト予測</title>
+<title>Loto Layer Ver.4 - AI統計ロト予測</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057a8">
 <style>
@@ -864,8 +864,76 @@
     border-radius: 999px;
     background: linear-gradient(90deg, var(--blue2), var(--green));
   }
+
+
+  /* Ver.4 advanced dashboards */
+  .data-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .mini-btn {
+    border: 1px solid var(--border);
+    background: var(--blue-light);
+    color: var(--blue);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    white-space: nowrap;
+  }
+  .mini-btn:disabled { opacity: .55; cursor: wait; }
+  .data-status {
+    font-size: .78rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .advanced-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .advanced-box {
+    background: #f5f7fc;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .advanced-box h3 {
+    font-size: .76rem;
+    color: var(--blue);
+    margin-bottom: 8px;
+  }
+  .radar-wrap { display:flex; justify-content:center; align-items:center; min-height:210px; }
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
+    gap: 4px;
+  }
+  .heat-cell {
+    border-radius: 7px;
+    padding: 6px 2px;
+    text-align: center;
+    font-family: 'Orbitron', monospace;
+    font-size: .66rem;
+    border: 1px solid rgba(0,0,0,.06);
+    background: rgba(0,87,168,.08);
+  }
+  .metric-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    margin: 8px 0;
+  }
+  .metric-title { font-size:.74rem; color:var(--muted); margin-bottom:6px; }
+  .metric-value { font-family:'Orbitron',monospace; font-size:1.25rem; font-weight:900; color:var(--blue); }
+  .metric-sub { font-size:.72rem; color:var(--muted); line-height:1.45; }
+
   @media (max-width: 520px) {
-    .strategy-grid, .analysis-grid { grid-template-columns: 1fr; }
+    .strategy-grid, .analysis-grid, .advanced-grid, .data-row { grid-template-columns: 1fr; }
   }
 
 </style>
@@ -901,7 +969,7 @@
       </svg>
     </div>
     <h1>LOTO LAYER</h1>
-    <p>統計 × AI 3層予測 ｜ ロト6 / ロト7 / ミニロト / ナンバーズ / ビンゴ5</p>
+    <p>統計 × AI 5層分析 ｜ 最新データ / レーダー / ヒートマップ / 期待指数</p>
   </div>
 
   <!-- Mode Select -->
@@ -1019,8 +1087,44 @@
   </div>
 
 
+
+
+  <!-- Ver.4 Data Fetch -->
+  <div class="card" id="dataFetchCard">
+    <div class="card-title">最新当選データ自動取得</div>
+    <div class="data-row">
+      <div class="data-status" id="dataStatus">未取得：内蔵データで分析中です。ボタンを押すと直近結果の取得を試します。</div>
+      <button class="mini-btn" id="fetchBtn" onclick="fetchLatestDataForCurrentMode()">最新データ取得</button>
+    </div>
+    <p class="analysis-note">※ ブラウザのCORS制限や取得元サイトの仕様変更で失敗する場合があります。その場合も内蔵データで動作します。</p>
+  </div>
+
+  <!-- Ver.4 Advanced Dashboard -->
+  <div class="card" id="advancedCard" style="display:none;">
+    <div class="card-title" id="advancedTitle">Ver.4 AI期待分析</div>
+    <div class="advanced-grid">
+      <div class="advanced-box">
+        <h3>AI期待値レーダー</h3>
+        <div class="radar-wrap"><canvas id="radarCanvas" width="220" height="220"></canvas></div>
+      </div>
+      <div class="advanced-box">
+        <h3>数字ヒートマップ</h3>
+        <div class="heatmap-grid" id="heatmapGrid"></div>
+      </div>
+      <div class="advanced-box">
+        <h3>AI期待値表示</h3>
+        <div id="aiExpectationBox"></div>
+      </div>
+      <div class="advanced-box">
+        <h3>高額期待指数</h3>
+        <div id="jackpotIndexBox"></div>
+      </div>
+    </div>
+  </div>
+
+
   <div class="footer">
-    LOTO LAYER Ver.3 — Powered by Groq API × AI Statistical Engine<br>
+    LOTO LAYER Ver.4 — Powered by Groq API × AI Statistical Engine<br>
     ※ このアプリは娯楽目的です。当選を保証するものではありません。
   </div>
 </div>
@@ -1030,6 +1134,9 @@
 let currentMode = 'loto6';
 let currentModel = 'groq';
 let currentCount = 3;
+let latestHistory = {};
+let latestDataMeta = {};
+let lastGeneratedSets = [];
 
 const MODES = {
   loto6: { max: 43, pick: 6, name: 'ロト6', badge: 'badge-loto6' },
@@ -1104,8 +1211,19 @@ function getNumberProfile(mode) {
 }
 
 function calcMissingCounts(mode) {
-  const { nums, freq, maxF, minF, range } = getNumberProfile(mode);
+  const history = getHistoryForMode(mode);
+  const { nums, freq, maxF, range } = getNumberProfile(mode);
   const result = {};
+  if (history) {
+    nums.forEach(n => {
+      let gap = history.length + 1;
+      for (let i = 0; i < history.length; i++) {
+        if (history[i].includes(n)) { gap = i; break; }
+      }
+      result[n] = gap;
+    });
+    return result;
+  }
   nums.forEach(n => {
     const cold = (maxF - freq[n]) / range;
     const rhythm = ((n * 17 + freq[n] * 7 + MODES[mode].pick * 13) % 50) / 50;
@@ -1208,6 +1326,180 @@ function renderAnalysisDashboard() {
   document.getElementById('analysisCard').style.display = '';
 }
 
+
+
+// ===== Ver.4 Latest Data / Expectation Engine =====
+const LATEST_URLS = {
+  loto6: 'https://takarakuji.rakuten.co.jp/backnumber/loto6/lastresults/',
+  loto7: 'https://takarakuji.rakuten.co.jp/backnumber/loto7/lastresults/',
+  mini:  'https://takarakuji.rakuten.co.jp/backnumber/miniloto/lastresults/'
+};
+
+function proxyUrl(url) {
+  return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+}
+
+function numbersNeededForMode(mode) {
+  return MODES[mode]?.pick || 0;
+}
+
+function parseLatestResults(html, mode) {
+  const pick = numbersNeededForMode(mode);
+  const text = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ');
+  const blocks = text.split(/第\s*\d+\s*回/).slice(1);
+  const results = [];
+  for (const block of blocks) {
+    const nums = (block.match(/\d{1,2}/g) || []).map(Number).filter(n => n >= 1 && n <= MODES[mode].max);
+    const unique = [];
+    for (const n of nums) {
+      if (!unique.includes(n)) unique.push(n);
+      if (unique.length === pick) break;
+    }
+    if (unique.length === pick) results.push(unique.sort((a,b)=>a-b));
+    if (results.length >= 50) break;
+  }
+  return results;
+}
+
+async function fetchLatestDataForCurrentMode() {
+  const mode = currentMode;
+  const status = document.getElementById('dataStatus');
+  const btn = document.getElementById('fetchBtn');
+  if (!LATEST_URLS[mode]) {
+    status.textContent = 'このモードは外部取得対象外です。ロト6・ロト7・ミニロトで利用できます。';
+    return;
+  }
+  btn.disabled = true;
+  status.textContent = `${MODES[mode].name} の最新データ取得を試行中です…`;
+  try {
+    const res = await fetch(proxyUrl(LATEST_URLS[mode]), { cache: 'no-store' });
+    if (!res.ok) throw new Error('取得に失敗しました');
+    const html = await res.text();
+    const parsed = parseLatestResults(html, mode);
+    if (!parsed.length) throw new Error('番号を解析できませんでした');
+    latestHistory[mode] = parsed;
+    latestDataMeta[mode] = { source: '楽天宝くじ直近結果', count: parsed.length, fetchedAt: new Date() };
+    status.textContent = `${MODES[mode].name}：直近${parsed.length}回分を取得しました。分析を最新データ寄りに切り替えます。`;
+    renderStats();
+    renderAnalysisDashboard();
+renderAdvancedDashboard();
+    renderAdvancedDashboard(lastGeneratedSets);
+  } catch (e) {
+    status.textContent = `取得できませんでした：${e.message}。内蔵データで分析を続けます。`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function getHistoryForMode(mode) {
+  return latestHistory[mode] || null;
+}
+
+function liveFrequency(mode) {
+  const history = getHistoryForMode(mode);
+  const m = MODES[mode];
+  if (!history || !m) return null;
+  const freq = Array(m.max + 1).fill(0);
+  history.forEach(row => row.forEach(n => { if (freq[n] !== undefined) freq[n]++; }));
+  return freq;
+}
+
+function calcNumberHeatScore(mode, n) {
+  const profile = getNumberProfile(mode);
+  const live = liveFrequency(mode);
+  const baseFreq = live ? live[n] : profile.freq[n];
+  const nums = profile.nums;
+  const values = nums.map(x => live ? live[x] : profile.freq[x]);
+  const min = Math.min(...values), max = Math.max(...values);
+  const hot = normalize01(baseFreq, min, max);
+  const missing = Math.min(1, (calcMissingCounts(mode)[n] || 0) / 50);
+  const month = Math.min(1, Math.max(0, getMonthBoost(mode, n)) / 20);
+  return Math.round((hot * 38 + missing * 32 + month * 30));
+}
+
+function calcAIExpectationForSet(set, mode) {
+  if (!set || !set.main) return 0;
+  const heat = set.main.reduce((a,n)=>a+calcNumberHeatScore(mode,n),0) / set.main.length;
+  const pair = Math.min(100, calcPairScore(mode, set.main) / (set.main.length * 7));
+  const jackpot = calcJackpotPatternScore(set.main, mode);
+  const month = Math.min(100, set.main.reduce((a,n)=>a+getMonthBoost(mode,n),0) / set.main.length * 5);
+  return Math.round(heat * .35 + pair * .2 + jackpot * .3 + month * .15);
+}
+
+function drawRadar(canvas, metrics) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const cx = w / 2, cy = h / 2, r = 82;
+  ctx.clearRect(0,0,w,h);
+  const labels = Object.keys(metrics);
+  const vals = Object.values(metrics);
+  ctx.font = '11px Noto Sans JP, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let ring = 1; ring <= 4; ring++) {
+    ctx.beginPath();
+    labels.forEach((_, i) => {
+      const a = -Math.PI/2 + i * Math.PI * 2 / labels.length;
+      const rr = r * ring / 4;
+      const x = cx + Math.cos(a) * rr;
+      const y = cy + Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(0,87,168,.16)';
+    ctx.stroke();
+  }
+  labels.forEach((label, i) => {
+    const a = -Math.PI/2 + i * Math.PI * 2 / labels.length;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
+    ctx.strokeStyle = 'rgba(0,87,168,.14)'; ctx.stroke();
+    ctx.fillStyle = '#6b7a99';
+    ctx.fillText(label, cx+Math.cos(a)*(r+20), cy+Math.sin(a)*(r+20));
+  });
+  ctx.beginPath();
+  vals.forEach((v, i) => {
+    const a = -Math.PI/2 + i * Math.PI * 2 / vals.length;
+    const rr = r * Math.max(0, Math.min(100, v)) / 100;
+    const x = cx + Math.cos(a) * rr;
+    const y = cy + Math.sin(a) * rr;
+    if (i === 0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,115,209,.22)';
+  ctx.strokeStyle = 'rgba(0,87,168,.85)';
+  ctx.lineWidth = 2;
+  ctx.fill(); ctx.stroke();
+}
+
+function renderAdvancedDashboard(sets = []) {
+  const mode = currentMode;
+  const m = MODES[mode];
+  const card = document.getElementById('advancedCard');
+  if (!m || m.digits || m.isBingo) { if (card) card.style.display = 'none'; return; }
+  const activeSets = sets.length ? sets : lastGeneratedSets;
+  const nums = getNumberProfile(mode).nums;
+  document.getElementById('advancedTitle').textContent = `Ver.4 AI期待分析（${m.name}）`;
+  document.getElementById('heatmapGrid').innerHTML = nums.map(n => {
+    const score = calcNumberHeatScore(mode, n);
+    const alpha = 0.08 + score / 100 * 0.42;
+    return `<div class="heat-cell" style="background:rgba(0,87,168,${alpha});color:${score>66?'#fff':'#1a1a2e'}" title="期待熱量 ${score}">${String(n).padStart(2,'0')}<br><small>${score}</small></div>`;
+  }).join('');
+  const best = activeSets.length ? activeSets.slice().sort((a,b)=>calcAIExpectationForSet(b,mode)-calcAIExpectationForSet(a,mode))[0] : null;
+  const expectation = best ? calcAIExpectationForSet(best, mode) : Math.round(nums.reduce((a,n)=>a+calcNumberHeatScore(mode,n),0)/nums.length);
+  const jackpot = best ? calcJackpotPatternScore(best.main, mode) : 66;
+  const pair = best ? Math.min(100, Math.round(calcPairScore(mode, best.main)/(m.pick*7))) : 62;
+  const month = best ? Math.min(100, Math.round(best.main.reduce((a,n)=>a+getMonthBoost(mode,n),0)/best.main.length*5)) : 60;
+  drawRadar(document.getElementById('radarCanvas'), { '熱量': expectation, '相関': pair, '高額': jackpot, '月別': month, '波動': best ? best.analysis.missing * 2 : 65 });
+  document.getElementById('aiExpectationBox').innerHTML = `
+    <div class="metric-card"><div class="metric-title">総合AI期待値</div><div class="metric-value">${expectation}</div><div class="metric-sub">数字熱量・相関・月別傾向・高額パターンを合成した独自スコアです。</div></div>
+    <div class="metric-card"><div class="metric-title">注目セット</div><div class="metric-sub">${best ? `${best.label}：${best.main.map(n=>String(n).padStart(2,'0')).join('・')}` : '予測生成後に表示されます。'}</div></div>`;
+  document.getElementById('jackpotIndexBox').innerHTML = `
+    <div class="metric-card"><div class="metric-title">高額期待指数</div><div class="metric-value">${jackpot}</div><div class="metric-sub">合計値・奇偶比率・高数字率・連番の入り方を評価します。</div></div>
+    <div class="metric-card"><div class="metric-title">データ状態</div><div class="metric-sub">${latestDataMeta[mode] ? `${latestDataMeta[mode].source}：${latestDataMeta[mode].count}回分` : '内蔵データ分析中'}</div></div>`;
+  card.style.display = '';
+}
+
 // ===== UI helpers =====
 function selectMode(mode) {
   currentMode = mode;
@@ -1242,7 +1534,8 @@ function selectMode(mode) {
   document.getElementById('numbersInputCard').style.display = isNumbers ? '' : 'none';
   document.getElementById('countCard').style.display = isNumbers ? 'none' : '';
   document.getElementById('statsCard').style.display = 'none';
-  if (!isNumbers && !isBingo) { renderStats(); renderAnalysisDashboard(); }
+  if (!isNumbers && !isBingo) { renderStats(); renderAnalysisDashboard();
+renderAdvancedDashboard(); renderAdvancedDashboard(); }
 }
 
 function selectModel(model) {
@@ -1810,6 +2103,7 @@ async function generate() {
   const mode = MODES[currentMode];
   currentCount = 3;
   const sets = buildThreeLayerSets(currentMode);
+  lastGeneratedSets = sets;
 
   // Render balls immediately
   const resultsArea = document.getElementById('resultsArea');
@@ -1849,6 +2143,7 @@ async function generate() {
   });
 
   document.getElementById('loadingArea').style.display = 'none';
+  renderAdvancedDashboard(sets);
 
   // AI comments for each set
   for (let i = 0; i < sets.length; i++) {
@@ -2078,6 +2373,7 @@ async function generateBingo5() {
 // ===== Init =====
 renderStats();
 renderAnalysisDashboard();
+renderAdvancedDashboard();
 
 // Save/load API key
 const savedGroq = localStorage.getItem('loto_layer_groq');
