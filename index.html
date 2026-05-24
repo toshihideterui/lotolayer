@@ -949,11 +949,30 @@
     border: 1px solid var(--border);
     background: #fff;
   }
-  .temp-hot { color:#c62828; background:#fff1f1; border-color:#ffc9c9; }
-  .temp-warm { color:#e65100; background:#fff5e8; border-color:#ffd6a6; }
-  .temp-cool { color:#0057a8; background:#eef6ff; border-color:#c7def7; }
-  .temp-cold { color:#4b5a78; background:#eef1f7; border-color:#d6deeb; }
-  .heat-cell small { display:block; opacity:.8; font-size:.55rem; margin-top:2px; }
+  .temp-hot { color:#b71c1c; background:linear-gradient(135deg,#fff1e8,#ffe0d6); border-color:#ff9a7a; }
+  .temp-warm { color:#d97706; background:linear-gradient(135deg,#fff8df,#fff0bd); border-color:#ffd166; }
+  .temp-cool { color:#0057a8; background:linear-gradient(135deg,#eef8ff,#dff1ff); border-color:#a9d6ff; }
+  .temp-cold { color:#4b5a78; background:linear-gradient(135deg,#f0f3f8,#e3e9f2); border-color:#c8d3e4; }
+  .heat-cell.temp-hot {
+    background:linear-gradient(135deg,#ff7a3d,#d42020)!important;
+    color:#fff!important;
+    border-color:#ffb199;
+    box-shadow:0 0 13px rgba(255,80,0,.55), inset 0 1px 0 rgba(255,255,255,.35);
+    animation: hotPulse 1.8s ease-in-out infinite;
+  }
+  .heat-cell.temp-warm {
+    background:linear-gradient(135deg,#ffe08a,#e6aa00)!important;
+    color:#6b3f00!important;
+    border-color:#ffd166;
+    box-shadow:0 0 8px rgba(230,170,0,.28);
+  }
+  .heat-cell.temp-cool { background:linear-gradient(135deg,#bfe4ff,#78b9e8)!important; color:#073a66!important; }
+  .heat-cell.temp-cold { background:linear-gradient(135deg,#f3f6fb,#d7e0ed)!important; color:#566274!important; }
+  @keyframes hotPulse {
+    0%,100% { transform:translateY(0); box-shadow:0 0 10px rgba(255,80,0,.42); }
+    50% { transform:translateY(-1px); box-shadow:0 0 18px rgba(255,80,0,.78); }
+  }
+  .heat-cell small { display:block; opacity:.9; font-size:.55rem; margin-top:2px; }
   .aura-stars {
     font-family:'Orbitron', monospace;
     font-size:1.35rem;
@@ -996,6 +1015,29 @@
   }
   .focus-number strong { display:block; color:var(--blue); font-size:.9rem; }
   .focus-number span { display:block; color:var(--muted); font-size:.58rem; margin-top:2px; }
+  .focus-number.temp-hot { box-shadow:0 0 12px rgba(255,80,0,.45); border-color:#ff9a7a; }
+  .focus-rank { font-size:.52rem!important; letter-spacing:.08em; color:#6b7a99!important; }
+  .ball-temp-tag {
+    margin-top:4px;
+    font-size:.56rem;
+    font-family:'Orbitron', monospace;
+    border-radius:999px;
+    padding:2px 6px;
+    border:1px solid var(--border);
+    background:#fff;
+    white-space:nowrap;
+  }
+  .ball-temp-tag.temp-hot { box-shadow:0 0 9px rgba(255,80,0,.45); }
+  .jackpot-aura-card {
+    background:linear-gradient(135deg,#fffdf3,#fff7d6);
+    border:1px solid #ffe08a;
+    border-radius:14px;
+    padding:12px;
+    margin:8px 0;
+    box-shadow:0 4px 16px rgba(230,170,0,.12);
+  }
+  .jackpot-aura-title { font-size:.72rem; color:#9a6a00; font-weight:700; letter-spacing:.04em; }
+  .jackpot-aura-value { font-family:'Orbitron', monospace; font-size:1.15rem; color:#0057a8; font-weight:900; margin-top:4px; }
 
 
   @media (max-width: 520px) {
@@ -1157,7 +1199,7 @@
 
   <!-- Ver.5 Advanced Dashboard -->
   <div class="card" id="advancedCard" style="display:none;">
-    <div class="card-title" id="advancedTitle">Ver.5 AI期待分析</div>
+    <div class="card-title" id="advancedTitle">Ver.6 AI数字解析</div>
     <div class="advanced-grid">
       <div class="advanced-box">
         <h3>AI期待値レーダー</h3>
@@ -1172,7 +1214,7 @@
         <div id="aiExpectationBox"></div>
       </div>
       <div class="advanced-box">
-        <h3>高額期待指数・期待オーラ</h3>
+        <h3>AI Jackpot Aura</h3>
         <div id="jackpotIndexBox"></div>
       </div>
       <div class="advanced-box">
@@ -1180,7 +1222,7 @@
         <div id="expectationBreakdownBox"></div>
       </div>
       <div class="advanced-box">
-        <h3>注目ナンバー温度</h3>
+        <h3>TOP HOT NUMBERS</h3>
         <div id="focusNumbersBox"></div>
       </div>
     </div>
@@ -1188,7 +1230,7 @@
 
 
   <div class="footer">
-    LOTO LAYER Ver.5 — Powered by Groq API × AI Statistical Engine<br>
+    LOTO LAYER Ver.6 — AI Number Analysis Engine<br>
     ※ このアプリは娯楽目的です。当選を保証するものではありません。
   </div>
 </div>
@@ -1479,9 +1521,9 @@ function drawRadar(canvas, metrics) {
 }
 
 function temperatureLabel(score) {
-  if (score >= 78) return { key: 'HOT', text: 'HOT', cls: 'temp-hot', mark: '🔥' };
-  if (score >= 58) return { key: 'WARM', text: 'WARM', cls: 'temp-warm', mark: '☀️' };
-  if (score >= 36) return { key: 'COOL', text: 'COOL', cls: 'temp-cool', mark: '💧' };
+  if (score >= 75) return { key: 'HOT', text: 'HOT', cls: 'temp-hot', mark: '🔥' };
+  if (score >= 60) return { key: 'WARM', text: 'WARM', cls: 'temp-warm', mark: '☀️' };
+  if (score >= 40) return { key: 'COOL', text: 'COOL', cls: 'temp-cool', mark: '💧' };
   return { key: 'COLD', text: 'COLD', cls: 'temp-cold', mark: '🧊' };
 }
 
@@ -1521,7 +1563,7 @@ function renderAdvancedDashboard(sets = []) {
   if (!m || m.digits || m.isBingo) { if (card) card.style.display = 'none'; return; }
   const activeSets = sets.length ? sets : lastGeneratedSets;
   const nums = getNumberProfile(mode).nums;
-  document.getElementById('advancedTitle').textContent = `Ver.5 AI期待分析（${m.name}）`;
+  document.getElementById('advancedTitle').textContent = `Ver.6 AI数字解析（${m.name}）`;
 
   document.getElementById('heatmapGrid').innerHTML = `
     <div class="temperature-legend" style="grid-column:1/-1;">
@@ -1552,12 +1594,12 @@ function renderAdvancedDashboard(sets = []) {
   drawRadar(document.getElementById('radarCanvas'), { '熱量': breakdown.heat, '相関': breakdown.pair, '高額': breakdown.jackpot, '月別': breakdown.month, '波動': breakdown.wave });
 
   document.getElementById('aiExpectationBox').innerHTML = `
-    <div class="metric-card"><div class="metric-title">総合AI期待値</div><div class="metric-value">${expectation}</div><div class="metric-sub">数字熱量・相関・月別傾向・高額パターン・波動指数を合成したVer.5スコアです。</div></div>
+    <div class="metric-card"><div class="metric-title">総合AI期待値</div><div class="metric-value">${expectation}</div><div class="metric-sub">数字熱量・相関・月別傾向・高額パターン・波動指数を合成したVer.6スコアです。</div></div>
     <div class="metric-card"><div class="metric-title">注目セット</div><div class="metric-sub">${best ? `${best.label}：${best.main.map(n=>String(n).padStart(2,'0')).join('・')}` : '予測生成後に表示されます。'}</div></div>`;
 
   document.getElementById('jackpotIndexBox').innerHTML = `
     <div class="metric-card"><div class="metric-title">高額期待指数</div><div class="metric-value">${jackpot}</div><div class="aura-stars">${auraStars(jackpot)}</div><div class="metric-sub">合計値・奇偶比率・高数字率・連番の入り方を評価。星は演出用の期待オーラです。</div></div>
-    <div class="metric-card"><div class="metric-title">データ状態</div><div class="metric-sub">内蔵データ分析中</div></div>`;
+    <div class="jackpot-aura-card"><div class="jackpot-aura-title">AI Jackpot Aura</div><div class="jackpot-aura-value">${jackpot >= 80 ? 'GOLD BURST' : jackpot >= 65 ? 'BRIGHT ZONE' : jackpot >= 50 ? 'STEADY GLOW' : 'LOW GLOW'}</div><div class="metric-sub">高額期待の雰囲気を演出するVer.6オーラ判定です。</div></div>`;
 
   document.getElementById('expectationBreakdownBox').innerHTML = `
     <div class="metric-card">
@@ -1569,8 +1611,8 @@ function renderAdvancedDashboard(sets = []) {
   const focusNums = nums.map(n => ({ n, score: calcNumberHeatScore(mode, n), temp: temperatureLabel(calcNumberHeatScore(mode, n)) }))
     .sort((a,b)=>b.score-a.score)
     .slice(0, 10);
-  document.getElementById('focusNumbersBox').innerHTML = `<div class="focus-number-grid">${focusNums.map(x => `
-    <div class="focus-number ${x.temp.cls}"><strong>${String(x.n).padStart(2,'0')}</strong><span>${x.temp.mark} ${x.temp.text}</span><span>${x.score}</span></div>
+  document.getElementById('focusNumbersBox').innerHTML = `<div class="focus-number-grid">${focusNums.map((x, idx) => `
+    <div class="focus-number ${x.temp.cls}"><span class="focus-rank">#${String(idx+1).padStart(2,'0')}</span><strong>${String(x.n).padStart(2,'0')}</strong><span>${x.temp.mark} ${x.temp.text}</span><span>${x.score}</span></div>
   `).join('')}</div>`;
 
   card.style.display = '';
@@ -2203,6 +2245,7 @@ async function generate() {
         ${s.main.map((n, bi) => `
           <div class="ball-wrapper" style="animation-delay:${bi*0.08}s">
             <div class="ball ${getBallColor(n, mode.max, false)}" style="animation-delay:${bi*0.08}s">${String(n).padStart(2,'0')}</div>
+            ${(() => { const t = temperatureLabel(calcNumberHeatScore(currentMode, n)); return `<div class="ball-temp-tag ${t.cls}">${t.mark} ${t.key}</div>`; })()}
           </div>
         `).join('')}
 
