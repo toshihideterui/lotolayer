@@ -1125,12 +1125,12 @@
 
   <!-- API key card -->
   <div class="card">
-    <div class="card-title">Groq API キー</div>
+    <div class="card-title">Groq API キー（任意）</div>
     <div class="api-input-wrap">
       <input type="password" class="api-input" id="groqKey" placeholder="gsk_..." />
       <button class="api-show-btn" onclick="toggleKey('groqKey', this)">表示</button>
     </div>
-    <p class="api-note" style="margin-top:8px;">Groq（llama-3.3-70b）を使用します。<a href="https://console.groq.com" target="_blank" style="color:var(--blue);">console.groq.com</a> で無料取得できます。</p>
+    <p class="api-note" style="margin-top:8px;">ロト/ビンゴ5のコメントはAPIなしで自動生成します。ナンバーズの月齢×九星コメントでGroqを使用します。<a href="https://console.groq.com" target="_blank" style="color:var(--blue);">console.groq.com</a> で無料取得できます。</p>
   </div>
 
   <!-- Strategy -->
@@ -1199,7 +1199,7 @@
 
   <!-- Ver.5 Advanced Dashboard -->
   <div class="card" id="advancedCard" style="display:none;">
-    <div class="card-title" id="advancedTitle">Ver.6 AI数字解析</div>
+    <div class="card-title" id="advancedTitle">Ver.6.1 AI数字解析</div>
     <div class="advanced-grid">
       <div class="advanced-box">
         <h3>AI期待値レーダー</h3>
@@ -1230,7 +1230,7 @@
 
 
   <div class="footer">
-    LOTO LAYER Ver.6 — AI Number Analysis Engine<br>
+    LOTO LAYER Ver.6.1 — AI Number Analysis Engine<br>
     ※ このアプリは娯楽目的です。当選を保証するものではありません。
   </div>
 </div>
@@ -1563,7 +1563,7 @@ function renderAdvancedDashboard(sets = []) {
   if (!m || m.digits || m.isBingo) { if (card) card.style.display = 'none'; return; }
   const activeSets = sets.length ? sets : lastGeneratedSets;
   const nums = getNumberProfile(mode).nums;
-  document.getElementById('advancedTitle').textContent = `Ver.6 AI数字解析（${m.name}）`;
+  document.getElementById('advancedTitle').textContent = `Ver.6.1 AI数字解析（${m.name}）`;
 
   document.getElementById('heatmapGrid').innerHTML = `
     <div class="temperature-legend" style="grid-column:1/-1;">
@@ -1594,12 +1594,12 @@ function renderAdvancedDashboard(sets = []) {
   drawRadar(document.getElementById('radarCanvas'), { '熱量': breakdown.heat, '相関': breakdown.pair, '高額': breakdown.jackpot, '月別': breakdown.month, '波動': breakdown.wave });
 
   document.getElementById('aiExpectationBox').innerHTML = `
-    <div class="metric-card"><div class="metric-title">総合AI期待値</div><div class="metric-value">${expectation}</div><div class="metric-sub">数字熱量・相関・月別傾向・高額パターン・波動指数を合成したVer.6スコアです。</div></div>
+    <div class="metric-card"><div class="metric-title">総合AI期待値</div><div class="metric-value">${expectation}</div><div class="metric-sub">数字熱量・相関・月別傾向・高額パターン・波動指数を合成したVer.6.1スコアです。</div></div>
     <div class="metric-card"><div class="metric-title">注目セット</div><div class="metric-sub">${best ? `${best.label}：${best.main.map(n=>String(n).padStart(2,'0')).join('・')}` : '予測生成後に表示されます。'}</div></div>`;
 
   document.getElementById('jackpotIndexBox').innerHTML = `
     <div class="metric-card"><div class="metric-title">高額期待指数</div><div class="metric-value">${jackpot}</div><div class="aura-stars">${auraStars(jackpot)}</div><div class="metric-sub">合計値・奇偶比率・高数字率・連番の入り方を評価。星は演出用の期待オーラです。</div></div>
-    <div class="jackpot-aura-card"><div class="jackpot-aura-title">AI Jackpot Aura</div><div class="jackpot-aura-value">${jackpot >= 80 ? 'GOLD BURST' : jackpot >= 65 ? 'BRIGHT ZONE' : jackpot >= 50 ? 'STEADY GLOW' : 'LOW GLOW'}</div><div class="metric-sub">高額期待の雰囲気を演出するVer.6オーラ判定です。</div></div>`;
+    <div class="jackpot-aura-card"><div class="jackpot-aura-title">AI Jackpot Aura</div><div class="jackpot-aura-value">${jackpot >= 80 ? 'GOLD BURST' : jackpot >= 65 ? 'BRIGHT ZONE' : jackpot >= 50 ? 'STEADY GLOW' : 'LOW GLOW'}</div><div class="metric-sub">高額期待の雰囲気を演出するVer.6.1オーラ判定です。</div></div>`;
 
   document.getElementById('expectationBreakdownBox').innerHTML = `
     <div class="metric-card">
@@ -1845,6 +1845,46 @@ function buildReasonText(set, mode) {
 
 function pseudoRecentGap(n, mode) {
   return calcMissingCounts(mode)[n] || 0;
+}
+
+function buildAutoAIComment(set, mode) {
+  const m = MODES[mode];
+  const profile = getNumberProfile(mode);
+  const heatAvg = Math.round(set.main.reduce((a,n)=>a+calcNumberHeatScore(mode,n),0) / set.main.length);
+  const topHeat = [...set.main].sort((a,b)=>calcNumberHeatScore(mode,b)-calcNumberHeatScore(mode,a)).slice(0,2);
+  const topGap = [...set.main].sort((a,b)=>pseudoRecentGap(b,mode)-pseudoRecentGap(a,mode)).slice(0,2);
+  const pair = calcPairScore(mode, set.main);
+  const jackpot = calcJackpotPatternScore(set.main, mode);
+  const expectation = calcAIExpectationForSet(set, mode);
+  const total = set.main.reduce((a,b)=>a+b,0);
+  const tempText = topHeat.map(n => { const t = temperatureLabel(calcNumberHeatScore(mode,n)); return `${n}番${t.mark}`; }).join('、');
+  const gapText = topGap.map(n => `${n}番は未出現${pseudoRecentGap(n,mode)}回`).join('、');
+  const base = buildReasonText(set, mode);
+
+  if (set.strategy === 'stable') {
+    return `AI自動解析では、${tempText}を軸にした安定寄りの${m.name}構成です。総合期待値${expectation}、平均熱量${heatAvg}、相関${pair}で、数字の散らばりと本命感のバランスを整えました。<br><span style="color:var(--muted);font-size:0.78rem;">補助ロジック：${base}</span>`;
+  }
+  if (set.strategy === 'wave') {
+    return `波動型では、${gapText}という冷え数字の反発感を重視しました。総合期待値${expectation}、月別補正${set.analysis.month}、平均熱量${heatAvg}を見ながら、戻り目を狙う数字配列にしています。<br><span style="color:var(--muted);font-size:0.78rem;">補助ロジック：${base}</span>`;
+  }
+  return `AI直感型は、合計値${total}と高額期待指数${jackpot}を見ながら、${tempText}を含めた少し攻めた構成です。相関${pair}、総合期待値${expectation}で、整いすぎない“揺らぎ”を残しています。<br><span style="color:var(--muted);font-size:0.78rem;">補助ロジック：${base}</span>`;
+}
+
+function buildBingoAutoComment(picks, idx) {
+  const sum = picks.reduce((a,b)=>a+b,0);
+  const high = picks.filter(n => n >= 26).length;
+  const odd = picks.filter(n => n % 2 === 1).length;
+  const even = picks.length - odd;
+  const centerSide = picks.slice(3,5).join('・');
+  const labels = ['本命バランス型', '波動反発型', 'AI直感型'];
+  const score = Math.min(99, Math.round(45 + high * 6 + odd * 3 + (sum % 17)));
+  if (idx === 0) {
+    return `${labels[idx]}として、奇数${odd}・偶数${even}の配置と合計値${sum}を見た安定寄りのビンゴ5構成です。中央周辺の${centerSide}が流れをつなぎ、AI期待値は${score}として表示しています。`;
+  }
+  if (idx === 1) {
+    return `${labels[idx]}では、高数字${high}個と合計値${sum}から、少し反発感のある並びを採用しました。ライン形成の起点を複数残し、数字の波を拾うイメージです。`;
+  }
+  return `${labels[idx]}は、低数字と高数字の混ざり方を少し攻めた配置にしています。FREEを中心に、${picks[0]}・${picks[4]}・${picks[7]}の流れがアクセントになるAI風コメントです。`;
 }
 
 // ===== API call =====
@@ -2205,12 +2245,7 @@ async function generate() {
     return generateBingo5();
   }
 
-  const groqKey = document.getElementById('groqKey').value.trim();
-  if (!groqKey) {
-    showError('Groq APIキーを入力してください');
-    return;
-  }
-  currentModel = 'groq';
+  currentModel = 'local-auto-comment';
 
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
@@ -2264,36 +2299,15 @@ async function generate() {
   document.getElementById('loadingArea').style.display = 'none';
   renderAdvancedDashboard(sets);
 
-  // AI comments for each set
+  // Ver.6.1: Groq APIなしでも動く自動AI風コメント
   for (let i = 0; i < sets.length; i++) {
     const s = sets[i];
-    const freq = getFreq(currentMode);
-    const freqInfo = s.main.map(n => `${n}番(出現${freq[n]}回/未出現推定${pseudoRecentGap(n, currentMode)}回)`).join('、');
-    const localReason = buildReasonText(s, currentMode);
-    const prompt = `以下のロト予測数字について、${s.label}としての予想理由を日本語で2〜3文だけ書いてください。断定せず、当選保証もしないでください。思考過程や下書きは不要です。日本語のコメント文のみ出力してください。
-種類: ${mode.name}
-戦略: ${s.label}（${s.tagline}）
-数字: ${s.main.join(', ')}
-頻度データ: ${freqInfo}
-補足理由: ${localReason}`;
-
-    try {
-      const rawComment = await callAPI(prompt);
-      const comment = extractJapanese(rawComment);
-      document.getElementById(`comment-${i}`).innerHTML = `
-        <div class="ai-comment">
-          <div class="ai-comment-header">${s.label} 予想理由 — llama-3.3-70b</div>
-          ${comment}<br><span style="color:var(--muted);font-size:0.78rem;">補助ロジック：${localReason}</span>
-        </div>
-      `;
-    } catch(e) {
-      document.getElementById(`comment-${i}`).innerHTML = `
-        <div class="ai-comment">
-          <div class="ai-comment-header">${s.label} 予想理由</div>
-          ${localReason}<br><span style="color:var(--red);font-size:0.78rem;">⚠️ AIコメント生成エラー: ${e.message}</span>
-        </div>
-      `;
-    }
+    document.getElementById(`comment-${i}`).innerHTML = `
+      <div class="ai-comment">
+        <div class="ai-comment-header">${s.label} 予想理由 — Auto AI Style</div>
+        ${buildAutoAIComment(s, currentMode)}
+      </div>
+    `;
   }
 
   btn.disabled = false;
@@ -2310,8 +2324,6 @@ function showError(msg) {
 
 // ===== Bingo5 Generator =====
 async function generateBingo5() {
-  const groqKey = document.getElementById('groqKey').value.trim();
-  if (!groqKey) { showError('Groq APIキーを入力してください'); return; }
 
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
@@ -2364,24 +2376,14 @@ async function generateBingo5() {
     resultsArea.innerHTML += cardHtml;
   });
 
-  // AIコメントを順に生成
+  // Ver.6.1: APIを使わず自動AI風コメントを生成
   for (let idx = 0; idx < allPicks.length; idx++) {
     const picks = allPicks[idx];
-    try {
-      const prompt = `以下はビンゴ5の予測数字です（3×3ビンゴカード、中央はFREE）。
-選んだ数字: ${picks.join(', ')}
-各グループ: ${BINGO_GROUPS.map((g,i) => `G${i+1}→${picks[i]}`).join(' ')}
-この選択について、運気・バランス・直感を絡めた楽しいコメントを日本語で2〜3文だけ書いてください。思考過程・英語・下書きは不要です。日本語のコメント文のみ出力してください。`;
-      const raw = await callAPI(prompt);
-      const comment = extractJapanese(raw);
-      document.getElementById(`bingo-comment-${idx}`).innerHTML = `
-        <div class="ai-comment">
-          <div class="ai-comment-header">${s.label} 予想理由 — llama-3.3-70b</div>
-          ${comment}<br><span style="color:var(--muted);font-size:0.78rem;">補助ロジック：${localReason}</span>
-        </div>`;
-    } catch(e) {
-      document.getElementById(`bingo-comment-${idx}`).innerHTML = `<div class="ai-comment">コメント生成エラー</div>`;
-    }
+    document.getElementById(`bingo-comment-${idx}`).innerHTML = `
+      <div class="ai-comment">
+        <div class="ai-comment-header">ビンゴ5 予想理由 — Auto AI Style</div>
+        ${buildBingoAutoComment(picks, idx)}
+      </div>`;
   }
 
   btn.disabled = false;
